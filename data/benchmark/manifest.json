@@ -1,0 +1,61 @@
+{
+  "seed": 42,
+  "total_scenarios": 5,
+  "scenarios": [
+    {
+      "scenario_id": "BENCHMARK-OOM-001",
+      "name": "oom_kill",
+      "title": "Worker Service Memory Leak & Container OOMKill",
+      "category": "RESOURCE_EXHAUSTION_MEMORY",
+      "service": "worker-service",
+      "files": {
+        "json": "oom_kill.json",
+        "jsonl": "oom_kill.jsonl"
+      }
+    },
+    {
+      "scenario_id": "BENCHMARK-DB-002",
+      "name": "db_pool_exhaustion",
+      "title": "Order Service Database Connection Pool Starvation",
+      "category": "DATABASE_CONNECTION_EXHAUSTION",
+      "service": "order-service",
+      "files": {
+        "json": "db_pool_exhaustion.json",
+        "jsonl": "db_pool_exhaustion.jsonl"
+      }
+    },
+    {
+      "scenario_id": "BENCHMARK-CFG-003",
+      "name": "config_drift",
+      "title": "Auth Service Configuration Drift & JWKS URL Mismatch",
+      "category": "CONFIGURATION_DRIFT",
+      "service": "auth-service",
+      "files": {
+        "json": "config_drift.json",
+        "jsonl": "config_drift.jsonl"
+      }
+    },
+    {
+      "scenario_id": "BENCHMARK-DEP-004",
+      "name": "dependency_deadlock",
+      "title": "Checkout Service Thread Pool Starvation via Upstream Dependency Latency",
+      "category": "DEPENDENCY_OUTAGE_TIMEOUT",
+      "service": "checkout-service",
+      "files": {
+        "json": "dependency_deadlock.json",
+        "jsonl": "dependency_deadlock.jsonl"
+      }
+    },
+    {
+      "scenario_id": "BENCHMARK-CACHE-005",
+      "name": "cache_poisoning",
+      "title": "Catalog Service Cache Stampede / Cache Key Corruption",
+      "category": "CACHE_STAMPEDE_SERIALIZATION",
+      "service": "catalog-service",
+      "files": {
+        "json": "cache_poisoning.json",
+        "jsonl": "cache_poisoning.jsonl"
+      }
+    }
+  ]
+}

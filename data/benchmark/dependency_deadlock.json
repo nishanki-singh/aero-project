@@ -1,0 +1,3961 @@
+{
+  "ground_truth": {
+    "scenario_id": "BENCHMARK-DEP-004",
+    "scenario_name": "Checkout Service Thread Pool Starvation via Upstream Dependency Latency",
+    "category": "DEPENDENCY_OUTAGE_TIMEOUT",
+    "affected_service": "checkout-service",
+    "trigger_event": "Third-party payment partner API (api.partner-payments.io) experienced latency degradation (>28s).",
+    "root_cause_summary": "Third-party payment gateway degraded to 28s response times. Because checkout-service lacked client-side socket timeouts and circuit breakers, all 100 worker threads blocked waiting for HTTP responses, causing complete thread pool starvation and unresponsive health checks.",
+    "expected_root_cause_category": "DEPENDENCY_OUTAGE_TIMEOUT",
+    "expected_evidence_signals": [
+      {
+        "signal_type": "METRIC",
+        "pattern": "dependency/partner_payment_latency_p99",
+        "description": "Upstream partner latency metric spiking to >28,000ms.",
+        "is_mandatory": true
+      },
+      {
+        "signal_type": "METRIC",
+        "pattern": "server/active_worker_threads",
+        "description": "Active worker thread count hitting 100% capacity while CPU is near 0%.",
+        "is_mandatory": true
+      },
+      {
+        "signal_type": "LOG",
+        "pattern": "Worker pool starvation",
+        "description": "ThreadPoolExecutor queue exhaustion log.",
+        "is_mandatory": true
+      },
+      {
+        "signal_type": "LOG",
+        "pattern": "api.partner-payments.io",
+        "description": "Outbound log identifying partner payment gateway as the bottleneck.",
+        "is_mandatory": true
+      }
+    ],
+    "expected_remediation": {
+      "key_actions": [
+        "Configure 2500ms socket timeout and circuit breaker for partner-payments client",
+        "Enable asynchronous fallback payment queue (degraded checkout mode)",
+        "Restart checkout-service pods to reclaim blocked worker threads"
+      ],
+      "expected_verification_metric": "Verify server/active_worker_threads drops below 30 and P99 latency returns under 200ms."
+    },
+    "expected_diagnostic_conclusion": "Diagnose checkout-service failure as Downstream Dependency Latency causing Thread Pool Starvation due to missing client timeouts.",
+    "evaluation_criteria": {
+      "weight_root_cause": 0.4,
+      "weight_evidence_citation": 0.4,
+      "weight_remediation": 0.2
+    }
+  },
+  "incident": {
+    "metadata": {
+      "incident_id": "INC-20260830-DEP",
+      "title": "Checkout Service Complete Freeze: Thread Pool Deadlock",
+      "severity": "SEV1_CRITICAL",
+      "status": "INVESTIGATING",
+      "affected_service": "checkout-service",
+      "impact_summary": "100% of customer checkouts hanging and timing out due to upstream payment partner latency.",
+      "detected_at": "2026-08-30T14:07:00Z",
+      "resolved_at": null
+    },
+    "telemetry": {
+      "time_window_start": "2026-08-30T14:00:00Z",
+      "time_window_end": "2026-08-30T14:25:00Z",
+      "logs": [
+        {
+          "timestamp": "2026-08-30T14:00:01Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-329258",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:01Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-308496",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:06Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-876646",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:14Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-872246",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:14Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-731262",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:37Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-133326",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:40Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-126225",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:45Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-835392",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:47Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-356787",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:00:57Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-191161",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:09Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-900581",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:16Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-865179",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:21Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-197251",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:24Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-476417",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:27Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-391369",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:28Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-391704",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:34Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-331148",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:51Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-895667",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:51Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-832052",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:01:54Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-733052",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:04Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-793384",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:14Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-183667",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:24Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-575435",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:29Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-230889",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:35Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-969693",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:36Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-838797",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:40Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-479201",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:40Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-270555",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:54Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-205907",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:02:59Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-182627",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:04Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-765822",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:10Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-864544",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:15Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-584714",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:23Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-319684",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:24Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-771088",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:42Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-835911",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:43Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-983794",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:44Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-330283",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:49Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-340174",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:03:59Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-779514",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:04Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-694731",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:09Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-246413",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:13Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-623481",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:15Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-688637",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:20Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-380746",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:25Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-581141",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:34Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-883300",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:37Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-711878",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:45Z",
+          "service_name": "checkout-service",
+          "log_level": "WARN",
+          "message": "Outbound HTTP call to https://api.partner-payments.io/v1/charge exceeding 20000ms for order_id=ord-8819",
+          "trace_id": "trace-dep-001",
+          "span_id": null,
+          "attributes": {
+            "dependency": "partner-payments",
+            "latency_ms": 21400
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:52Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-944151",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:04:56Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-429963",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:05Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-214975",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:08Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-617488",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:09Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-267753",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:24Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-590785",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:25Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-329974",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:33Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-680099",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:38Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-503457",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:46Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-814825",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:50Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-542666",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:05:55Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-813328",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:07Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-555884",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:10Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-103402",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:17Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-456699",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:19Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-632323",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:23Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-665579",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:30Z",
+          "service_name": "checkout-service",
+          "log_level": "ERROR",
+          "message": "Worker pool starvation: ThreadPoolExecutor queue full (active=100, queue_size=500, rejected=124)",
+          "trace_id": "trace-dep-002",
+          "span_id": null,
+          "attributes": {
+            "active_threads": 100,
+            "rejected_requests": 124
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:32Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-632342",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:38Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-260263",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:46Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-376183",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:56Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-887352",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:06:58Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-755674",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:01Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-480612",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:03Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-694916",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:05Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-867460",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:10Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-653306",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:31Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-897549",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:34Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-234628",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:38Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-612340",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:42Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-676510",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:49Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-100599",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:07:56Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-351083",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:04Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-122056",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:07Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-335612",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:13Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-891952",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:15Z",
+          "service_name": "checkout-service",
+          "log_level": "FATAL",
+          "message": "Health probe failed: GET /healthz timed out after 5000ms (worker thread pool unresponsive)",
+          "trace_id": "trace-dep-003",
+          "span_id": null,
+          "attributes": {
+            "probe": "livenessProbe"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:28Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-573417",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:37Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-341292",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:37Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-107540",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:42Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-491559",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:45Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-518373",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:46Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-310922",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:08:55Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-543692",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:03Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-170674",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:04Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-761759",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:04Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-349565",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:06Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-790993",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:13Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-238739",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:17Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-608993",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:30Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-922733",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:30Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-299659",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:46Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-704201",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:09:57Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-446479",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:03Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-785197",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:11Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-585100",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:12Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-662336",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:15Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-564656",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:25Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-455784",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:26Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-864491",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:27Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-544154",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:28Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-542374",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:41Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-163556",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:10:51Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-360735",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:03Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-666847",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:10Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-102260",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:13Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-161483",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:24Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-922157",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:26Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-604740",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:27Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-865990",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:50Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-399105",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:51Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-202664",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:53Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-197793",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:11:59Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-274389",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:03Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-871476",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:03Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-184002",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:12Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-328275",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:20Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-152578",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:34Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-884309",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:37Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-627276",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:45Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-262316",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:50Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-794022",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:54Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-171849",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:12:58Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-265080",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:07Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-358175",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:13Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-850981",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:20Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-378517",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:25Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-804318",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:33Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-373432",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:37Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-141672",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:38Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-808011",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:39Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-539589",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:42Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-692683",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:13:55Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-523389",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:06Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-663750",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:08Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-172132",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:13Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-378082",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:18Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-559469",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:19Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-946305",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:20Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-109767",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:29Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-690341",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:41Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-579434",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:53Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-837715",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:14:56Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-487477",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:07Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-878480",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:16Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-612262",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:18Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-320861",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:35Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-385577",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:41Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-108203",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:42Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-413921",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:43Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-994343",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:45Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-313487",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:56Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-377312",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:15:59Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-208618",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:02Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-710805",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:07Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-824586",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:16Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-196781",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:16Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-877236",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:17Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-103717",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:21Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-768061",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:27Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-110139",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:28Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-839945",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:40Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-969634",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:16:57Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-672092",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:01Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-872343",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:08Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-423232",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:13Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-361650",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:23Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-475190",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:35Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-550664",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:39Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-262060",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:42Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-470858",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:49Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-526117",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:51Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-532322",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:17:59Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-270395",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:01Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-302511",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:14Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-956253",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:15Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-266931",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:19Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-333752",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:24Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-593554",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:42Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-950132",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:50Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-213346",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:58Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-466643",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:59Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-920391",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:18:59Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-941204",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:01Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-373903",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:02Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-725550",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:11Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-378361",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:17Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-772642",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:25Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-392136",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:27Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-863934",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:32Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-812526",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:50Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-557592",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:53Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-447235",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:19:55Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-910891",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:16Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-843215",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:20Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-989208",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:24Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-299312",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:27Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-645175",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:27Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-796503",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:38Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-221263",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:42Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-481913",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:46Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-872840",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:58Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-753425",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:20:59Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-820221",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:07Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-414910",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:08Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-540869",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:18Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-550770",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:26Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-521947",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:32Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-799287",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:35Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-418635",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:36Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-525800",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:42Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-810219",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:44Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-681343",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:21:47Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-745414",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:13Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-596171",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:19Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-945742",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:28Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-808446",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:32Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-763686",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:39Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-197923",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:41Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Refreshed security token cache successfully",
+          "trace_id": "trace-587575",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:42Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-397571",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:50Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-736130",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:50Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-277934",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:22:52Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-805477",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:02Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-598216",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:12Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-125611",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:12Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-830180",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:15Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-787926",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:24Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-519066",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:26Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-703634",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:27Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-284430",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:39Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-577538",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:44Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-887443",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:23:55Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-916232",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:08Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-800005",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:15Z",
+          "service_name": "order-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-578634",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:20Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-742412",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:27Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-567574",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:29Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Processed HTTP GET /healthz 200 OK in 2.1ms",
+          "trace_id": "trace-684482",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:33Z",
+          "service_name": "worker-service",
+          "log_level": "INFO",
+          "message": "Executed periodic garbage collection cycle",
+          "trace_id": "trace-724377",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:51Z",
+          "service_name": "auth-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-643118",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:52Z",
+          "service_name": "catalog-service",
+          "log_level": "INFO",
+          "message": "Retrieved cached user session from memory",
+          "trace_id": "trace-629298",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:55Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Processed order batch item from Kafka topic",
+          "trace_id": "trace-571932",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        },
+        {
+          "timestamp": "2026-08-30T14:24:57Z",
+          "service_name": "checkout-service",
+          "log_level": "INFO",
+          "message": "Dispatched background async notification to queue",
+          "trace_id": "trace-879779",
+          "span_id": null,
+          "attributes": {
+            "environment": "production",
+            "region": "us-central1"
+          }
+        }
+      ],
+      "metrics": [
+        {
+          "metric_name": "dependency/partner_payment_latency_p99",
+          "service_name": "checkout-service",
+          "unit": "ms",
+          "points": [
+            {
+              "timestamp": "2026-08-30T14:00:00Z",
+              "value": 180.0
+            },
+            {
+              "timestamp": "2026-08-30T14:01:00Z",
+              "value": 180.0
+            },
+            {
+              "timestamp": "2026-08-30T14:02:00Z",
+              "value": 180.0
+            },
+            {
+              "timestamp": "2026-08-30T14:03:00Z",
+              "value": 180.0
+            },
+            {
+              "timestamp": "2026-08-30T14:04:00Z",
+              "value": 29467.69
+            },
+            {
+              "timestamp": "2026-08-30T14:05:00Z",
+              "value": 29065.27
+            },
+            {
+              "timestamp": "2026-08-30T14:06:00Z",
+              "value": 28194.41
+            },
+            {
+              "timestamp": "2026-08-30T14:07:00Z",
+              "value": 28356.76
+            },
+            {
+              "timestamp": "2026-08-30T14:08:00Z",
+              "value": 28241.14
+            },
+            {
+              "timestamp": "2026-08-30T14:09:00Z",
+              "value": 28511.92
+            },
+            {
+              "timestamp": "2026-08-30T14:10:00Z",
+              "value": 28182.46
+            },
+            {
+              "timestamp": "2026-08-30T14:11:00Z",
+              "value": 29199.15
+            },
+            {
+              "timestamp": "2026-08-30T14:12:00Z",
+              "value": 29144.66
+            },
+            {
+              "timestamp": "2026-08-30T14:13:00Z",
+              "value": 27711.08
+            },
+            {
+              "timestamp": "2026-08-30T14:14:00Z",
+              "value": 29421.58
+            },
+            {
+              "timestamp": "2026-08-30T14:15:00Z",
+              "value": 28771.17
+            },
+            {
+              "timestamp": "2026-08-30T14:16:00Z",
+              "value": 29157.41
+            },
+            {
+              "timestamp": "2026-08-30T14:17:00Z",
+              "value": 28914.62
+            },
+            {
+              "timestamp": "2026-08-30T14:18:00Z",
+              "value": 28370.97
+            },
+            {
+              "timestamp": "2026-08-30T14:19:00Z",
+              "value": 28967.59
+            },
+            {
+              "timestamp": "2026-08-30T14:20:00Z",
+              "value": 29430.95
+            },
+            {
+              "timestamp": "2026-08-30T14:21:00Z",
+              "value": 28040.16
+            },
+            {
+              "timestamp": "2026-08-30T14:22:00Z",
+              "value": 29116.4
+            },
+            {
+              "timestamp": "2026-08-30T14:23:00Z",
+              "value": 28576.35
+            },
+            {
+              "timestamp": "2026-08-30T14:24:00Z",
+              "value": 28467.0
+            }
+          ],
+          "labels": {
+            "dependency": "partner-payments-api",
+            "target_host": "api.partner-payments.io"
+          }
+        },
+        {
+          "metric_name": "server/active_worker_threads",
+          "service_name": "checkout-service",
+          "unit": "count",
+          "points": [
+            {
+              "timestamp": "2026-08-30T14:00:00Z",
+              "value": 14.74
+            },
+            {
+              "timestamp": "2026-08-30T14:01:00Z",
+              "value": 15.92
+            },
+            {
+              "timestamp": "2026-08-30T14:02:00Z",
+              "value": 14.07
+            },
+            {
+              "timestamp": "2026-08-30T14:03:00Z",
+              "value": 16.41
+            },
+            {
+              "timestamp": "2026-08-30T14:04:00Z",
+              "value": 37.66
+            },
+            {
+              "timestamp": "2026-08-30T14:05:00Z",
+              "value": 58.17
+            },
+            {
+              "timestamp": "2026-08-30T14:06:00Z",
+              "value": 81.76
+            },
+            {
+              "timestamp": "2026-08-30T14:07:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:08:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:09:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:10:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:11:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:12:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:13:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:14:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:15:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:16:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:17:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:18:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:19:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:20:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:21:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:22:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:23:00Z",
+              "value": 100.0
+            },
+            {
+              "timestamp": "2026-08-30T14:24:00Z",
+              "value": 100.0
+            }
+          ],
+          "labels": {
+            "pool": "http-worker-pool",
+            "max_capacity": "100"
+          }
+        },
+        {
+          "metric_name": "container/cpu_utilization",
+          "service_name": "checkout-service",
+          "unit": "percent",
+          "points": [
+            {
+              "timestamp": "2026-08-30T14:00:00Z",
+              "value": 28.0
+            },
+            {
+              "timestamp": "2026-08-30T14:01:00Z",
+              "value": 28.0
+            },
+            {
+              "timestamp": "2026-08-30T14:02:00Z",
+              "value": 28.0
+            },
+            {
+              "timestamp": "2026-08-30T14:03:00Z",
+              "value": 28.0
+            },
+            {
+              "timestamp": "2026-08-30T14:04:00Z",
+              "value": 28.0
+            },
+            {
+              "timestamp": "2026-08-30T14:05:00Z",
+              "value": 2.06
+            },
+            {
+              "timestamp": "2026-08-30T14:06:00Z",
+              "value": 2.21
+            },
+            {
+              "timestamp": "2026-08-30T14:07:00Z",
+              "value": 1.98
+            },
+            {
+              "timestamp": "2026-08-30T14:08:00Z",
+              "value": 1.63
+            },
+            {
+              "timestamp": "2026-08-30T14:09:00Z",
+              "value": 2.45
+            },
+            {
+              "timestamp": "2026-08-30T14:10:00Z",
+              "value": 1.78
+            },
+            {
+              "timestamp": "2026-08-30T14:11:00Z",
+              "value": 1.81
+            },
+            {
+              "timestamp": "2026-08-30T14:12:00Z",
+              "value": 2.4
+            },
+            {
+              "timestamp": "2026-08-30T14:13:00Z",
+              "value": 1.94
+            },
+            {
+              "timestamp": "2026-08-30T14:14:00Z",
+              "value": 2.48
+            },
+            {
+              "timestamp": "2026-08-30T14:15:00Z",
+              "value": 2.3
+            },
+            {
+              "timestamp": "2026-08-30T14:16:00Z",
+              "value": 1.88
+            },
+            {
+              "timestamp": "2026-08-30T14:17:00Z",
+              "value": 1.61
+            },
+            {
+              "timestamp": "2026-08-30T14:18:00Z",
+              "value": 2.55
+            },
+            {
+              "timestamp": "2026-08-30T14:19:00Z",
+              "value": 1.69
+            },
+            {
+              "timestamp": "2026-08-30T14:20:00Z",
+              "value": 2.32
+            },
+            {
+              "timestamp": "2026-08-30T14:21:00Z",
+              "value": 2.09
+            },
+            {
+              "timestamp": "2026-08-30T14:22:00Z",
+              "value": 2.36
+            },
+            {
+              "timestamp": "2026-08-30T14:23:00Z",
+              "value": 2.29
+            },
+            {
+              "timestamp": "2026-08-30T14:24:00Z",
+              "value": 2.25
+            }
+          ],
+          "labels": {
+            "container": "checkout-api"
+          }
+        }
+      ],
+      "deployments": [],
+      "health_signals": [
+        {
+          "timestamp": "2026-08-30T14:00:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 20.18,
+          "error_rate_pct": 0.012,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:00:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.75,
+          "error_rate_pct": 0.038,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:00:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 25.43,
+          "error_rate_pct": 0.031,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:00:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 20.49,
+          "error_rate_pct": 0.004,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:00:00Z",
+          "service_name": "checkout-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 37.36,
+          "error_rate_pct": 0.0,
+          "details": "Healthy"
+        },
+        {
+          "timestamp": "2026-08-30T14:02:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 20.71,
+          "error_rate_pct": 0.014,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:02:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 21.39,
+          "error_rate_pct": 0.027,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:02:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 17.77,
+          "error_rate_pct": 0.012,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:02:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 28.88,
+          "error_rate_pct": 0.035,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:02:00Z",
+          "service_name": "checkout-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 41.89,
+          "error_rate_pct": 0.0,
+          "details": "Healthy"
+        },
+        {
+          "timestamp": "2026-08-30T14:04:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 16.28,
+          "error_rate_pct": 0.02,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:04:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 25.85,
+          "error_rate_pct": 0.021,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:04:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 19.14,
+          "error_rate_pct": 0.021,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:04:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 33.1,
+          "error_rate_pct": 0.029,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:04:00Z",
+          "service_name": "checkout-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 31.4,
+          "error_rate_pct": 0.0,
+          "details": "Healthy"
+        },
+        {
+          "timestamp": "2026-08-30T14:06:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 28.91,
+          "error_rate_pct": 0.043,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:06:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.31,
+          "error_rate_pct": 0.019,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:06:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 15.12,
+          "error_rate_pct": 0.018,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:06:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.07,
+          "error_rate_pct": 0.043,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:06:00Z",
+          "service_name": "checkout-service",
+          "status": "DEGRADED",
+          "latency_p99_ms": 7215.96,
+          "error_rate_pct": 20.0,
+          "details": "High checkout latency"
+        },
+        {
+          "timestamp": "2026-08-30T14:08:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 34.07,
+          "error_rate_pct": 0.021,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:08:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 29.95,
+          "error_rate_pct": 0.027,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:08:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.07,
+          "error_rate_pct": 0.011,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:08:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 19.39,
+          "error_rate_pct": 0.022,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:08:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:10:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 15.58,
+          "error_rate_pct": 0.017,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:10:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 28.58,
+          "error_rate_pct": 0.02,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:10:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 18.3,
+          "error_rate_pct": 0.023,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:10:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 17.55,
+          "error_rate_pct": 0.031,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:10:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:12:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 15.54,
+          "error_rate_pct": 0.02,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:12:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 26.29,
+          "error_rate_pct": 0.001,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:12:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.85,
+          "error_rate_pct": 0.007,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:12:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 24.23,
+          "error_rate_pct": 0.003,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:12:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:14:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 22.58,
+          "error_rate_pct": 0.011,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:14:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 21.54,
+          "error_rate_pct": 0.038,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:14:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 22.58,
+          "error_rate_pct": 0.038,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:14:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 31.64,
+          "error_rate_pct": 0.013,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:14:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:16:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 16.64,
+          "error_rate_pct": 0.001,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:16:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 25.79,
+          "error_rate_pct": 0.05,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:16:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 22.0,
+          "error_rate_pct": 0.033,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:16:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.62,
+          "error_rate_pct": 0.033,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:16:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:18:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.08,
+          "error_rate_pct": 0.047,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:18:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 18.99,
+          "error_rate_pct": 0.001,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:18:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 18.05,
+          "error_rate_pct": 0.006,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:18:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 28.39,
+          "error_rate_pct": 0.028,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:18:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:20:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 19.36,
+          "error_rate_pct": 0.035,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:20:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.34,
+          "error_rate_pct": 0.008,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:20:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.14,
+          "error_rate_pct": 0.037,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:20:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 17.29,
+          "error_rate_pct": 0.041,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:20:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:22:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 34.29,
+          "error_rate_pct": 0.005,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:22:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 15.51,
+          "error_rate_pct": 0.016,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:22:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 28.55,
+          "error_rate_pct": 0.048,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:22:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 22.93,
+          "error_rate_pct": 0.036,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:22:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        },
+        {
+          "timestamp": "2026-08-30T14:24:00Z",
+          "service_name": "auth-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 16.52,
+          "error_rate_pct": 0.035,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:24:00Z",
+          "service_name": "order-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.54,
+          "error_rate_pct": 0.005,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:24:00Z",
+          "service_name": "worker-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 30.45,
+          "error_rate_pct": 0.043,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:24:00Z",
+          "service_name": "catalog-service",
+          "status": "HEALTHY",
+          "latency_p99_ms": 27.01,
+          "error_rate_pct": 0.006,
+          "details": "All health checks passing (200 OK)"
+        },
+        {
+          "timestamp": "2026-08-30T14:24:00Z",
+          "service_name": "checkout-service",
+          "status": "UNHEALTHY",
+          "latency_p99_ms": 30000.0,
+          "error_rate_pct": 95.0,
+          "details": "Thread pool starvation (Health check timeout)"
+        }
+      ]
+    }
+  }
+}
