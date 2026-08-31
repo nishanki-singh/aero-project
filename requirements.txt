@@ -1,4 +1,6 @@
-# Core dependencies for AERO Phase 1: Schemas, Synthetic Benchmark & Evaluation
+# Core dependencies for AERO: Schemas, Synthetic Benchmark, Telemetry & Vertex AI
 pydantic>=2.7.0
 pytest>=8.0.0
 python-dateutil>=2.8.2
+google-cloud-aiplatform>=1.60.0
+tenacity>=8.2.0
