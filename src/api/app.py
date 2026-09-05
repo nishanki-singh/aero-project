@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.api.routes import (
     diagnostic_router,
@@ -58,7 +60,13 @@ def create_app() -> FastAPI:
     app.include_router(postmortem_router)
     app.include_router(evaluation_router)
 
+    # Mount static assets for SRE Command Center UI (Stage 4A)
+    web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
+    if os.path.exists(web_dir):
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
+
     return app
 
 
 app = create_app()
+

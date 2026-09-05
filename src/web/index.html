@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERO — AI-Enabled Reliability & Operations Copilot</title>
+  <meta name="description" content="AERO: Autonomous Cloud Reliability & SRE Copilot powered by Google Cloud Vertex AI & Gemini">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/design_system.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <div class="app-container" id="app-root">
+    
+    <!-- Top Command Center Header -->
+    <header class="app-header" id="app-header">
+      <div class="header-left">
+        <a href="#" class="brand-container" id="brand-link">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-text">
+            <span class="brand-title">AERO</span>
+            <span class="brand-subtitle">Google Cloud SRE Copilot</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="header-center">
+        <div class="scenario-selector-container">
+          <span class="scenario-label">Scenario:</span>
+          <select id="scenario-select" class="scenario-select" aria-label="Incident Scenario Selection">
+            <option value="" disabled selected>Loading scenarios...</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- GCP Cloud Project Indicator -->
+        <div class="gcp-info-badge" id="gcp-badge" title="Target Google Cloud Project & Region">
+          <span class="gcp-dot"></span>
+          <span class="project-id" id="gcp-project-id">project-a47199cc-a109-4cd5-917</span>
+          <span class="region-tag" id="gcp-region">us-central1</span>
+        </div>
+
+        <!-- Provider Control (Mock by default) -->
+        <div class="provider-toggle-group" id="provider-toggle" role="group" aria-label="AI Engine Provider Mode">
+          <button type="button" class="provider-btn active" id="btn-provider-mock" data-provider="mock">
+            MOCK
+          </button>
+          <button type="button" class="provider-btn live" id="btn-provider-live" data-provider="live" title="Vertex AI Live Inference (Configuration element - requires explicit run)">
+            LIVE VERTEX
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Incident Lifecycle Navigation Ribbon -->
+    <nav class="lifecycle-nav-wrapper" aria-label="Incident Lifecycle Stages">
+      <ul class="lifecycle-nav" id="lifecycle-nav">
+        <li>
+          <button type="button" class="lifecycle-tab active" data-tab="telemetry" id="tab-telemetry">
+            <span class="lifecycle-step-num">1</span>
+            <span>Evidence & Telemetry</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="timeline" id="tab-timeline">
+            <span class="lifecycle-step-num">2</span>
+            <span>Timeline</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="rca" id="tab-rca">
+            <span class="lifecycle-step-num">3</span>
+            <span>RCA & Diagnosis</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="grounding" id="tab-grounding">
+            <span class="lifecycle-step-num">4</span>
+            <span>Evidence Grounding</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="remediation" id="tab-remediation">
+            <span class="lifecycle-step-num">5</span>
+            <span>Safe Remediation</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="postmortem" id="tab-postmortem">
+            <span class="lifecycle-step-num">6</span>
+            <span>Postmortem</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="lifecycle-tab" data-tab="architecture" id="tab-architecture">
+            <span class="lifecycle-step-num">7</span>
+            <span>Topology & Graph</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Error Banner Container -->
+    <div id="global-error-container" style="display: none; padding: 12px 24px 0 24px;">
+      <div class="alert-banner alert-banner-error" id="global-error-msg"></div>
+    </div>
+
+    <!-- Main Command Workspace Grid -->
+    <main class="main-workspace" id="main-workspace">
+      
+      <!-- Left Column: Incident Context & Telemetry Summary -->
+      <section class="left-pane" id="left-pane" aria-label="Incident Telemetry & Context">
+        
+        <!-- Active Incident Summary Card -->
+        <div class="pane-card incident-summary-card" id="incident-summary-card">
+          <div class="pane-header">
+            <div class="pane-title-group">
+              <span class="badge badge-critical" id="incident-severity-badge">
+                <span class="badge-dot pulse"></span>
+                <span id="incident-severity">CRITICAL</span>
+              </span>
+              <span class="pane-title" id="incident-service-name">Service</span>
+            </div>
+            <span class="font-mono" style="font-size: 11px; color: var(--text-muted);" id="incident-id-display">#INC-0000</span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">Incident:</span>
+            <span class="meta-value" id="incident-title">Loading scenario...</span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">Environment:</span>
+            <span class="meta-value" id="incident-env">gcp-prod-us-central1</span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">Telemetry Pack:</span>
+            <span class="meta-value" id="incident-telemetry-count">-- logs · -- metrics · -- traces</span>
+          </div>
+
+          <div class="alert-banner alert-banner-info" style="font-size: 11px; padding: 8px 12px;">
+            <span>🛡️ Remediation Simulator is dry-run only. Evidence verified against telemetry.</span>
+          </div>
+        </div>
+
+        <!-- Telemetry Stream Summary / Filter Container (Stage 4B placeholder) -->
+        <div class="pane-card" id="telemetry-summary-card">
+          <div class="pane-header">
+            <div class="pane-title-group">
+              <span class="pane-title">Telemetry Evidence Stream</span>
+            </div>
+            <span class="badge badge-info" id="telemetry-badge">Ready</span>
+          </div>
+          <div id="telemetry-pane-body">
+            <div class="placeholder-card" style="padding: 24px 16px;">
+              <div class="placeholder-icon">📊</div>
+              <div class="placeholder-title" style="font-size: 15px;">Evidence Stream</div>
+              <p class="placeholder-desc" style="font-size: 12px;">
+                Logs, metrics, and trace spans for the selected incident will stream here.
+              </p>
+              <span class="placeholder-tag">Stage 4B</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Right Column: Active Lifecycle View / AI Copilot Workspace -->
+      <section class="right-pane" id="right-pane" aria-label="Investigation & Copilot Reasoning">
+        <div id="active-view-container">
+          <!-- Dynamic Lifecycle View injected here -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Dock for Quick Actions (Stage 4G) -->
+    <div class="floating-dock">
+      <button type="button" class="dock-btn" id="btn-dock-risk" title="Risk & Change Advisor">
+        <span>⚡</span>
+        <span>Risk Advisor</span>
+      </button>
+      <button type="button" class="dock-btn" id="btn-dock-chat" title="Interactive SRE Copilot Chat">
+        <span>💬</span>
+        <span>SRE Copilot</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Application Bootstrap Script -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
