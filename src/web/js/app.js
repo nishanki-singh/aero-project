@@ -6,6 +6,7 @@
 import { store } from './state.js';
 import { api } from './api.js';
 import { initHeader } from './components/header.js';
+import { renderTelemetryWorkspace } from './components/telemetry.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -16,13 +17,13 @@ const STAGE_META = {
     desc: 'Deep inspection of correlated incident logs, time-series metrics, anomaly thresholds, and distributed trace spans.'
   },
   timeline: {
-    stage: 'Stage 4B',
+    stage: 'Stage 4C',
     title: 'Incident Timeline & State Machine',
     icon: '⏱️',
     desc: 'Chronological progression of anomalies, trigger events, alert thresholds, and operational milestones.'
   },
   rca: {
-    stage: 'Stage 4C',
+    stage: 'Stage 4D',
     title: 'Root Cause Analysis & Diagnostic Reasoning',
     icon: '🧠',
     desc: 'Structured SRE diagnostic report featuring primary root cause, contributing factors, affected services, and confidence score.'
@@ -108,15 +109,23 @@ export function extractScenarioInfo(scenarioData, fallbackKey) {
 }
 
 /**
- * Render active lifecycle view placeholder in the right workspace pane.
+ * Render active lifecycle view in the right workspace pane.
  * @param {string} tabKey 
  */
 function renderActiveView(tabKey) {
   const container = document.getElementById('active-view-container');
   if (!container) return;
 
-  const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const state = store.getState();
+
+  // Stage 4B: Fully rendered Incident Workspace & Telemetry for 'telemetry' tab
+  if (tabKey === 'telemetry') {
+    renderTelemetryWorkspace(container, state.activeScenarioData);
+    return;
+  }
+
+  // Future Stages (4C-4H): Sleek placeholder containers
+  const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const info = extractScenarioInfo(state.activeScenarioData, state.activeScenarioKey);
 
   container.innerHTML = `
@@ -138,6 +147,55 @@ function renderActiveView(tabKey) {
             Active Scenario: ${info.title} (${info.key})
           </span>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Update left-pane telemetry stream quick summary.
+ * @param {object} scenarioData 
+ */
+function updateTelemetryLeftPane(scenarioData) {
+  const container = document.getElementById('telemetry-pane-body');
+  if (!container) return;
+
+  if (!scenarioData) {
+    container.innerHTML = `
+      <div class="placeholder-card" style="padding: 20px 16px;">
+        <p class="placeholder-desc" style="font-size: 11px;">Select a scenario to view telemetry stream.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const incident = scenarioData.incident || {};
+  const telemetry = incident.telemetry || scenarioData.telemetry || {};
+  const logs = telemetry.logs || [];
+  const deployments = telemetry.deployments || [];
+  const healthSignals = telemetry.health_signals || [];
+
+  const errorLogs = logs.filter((l) => ['FATAL', 'ERROR'].includes(String(l.log_level).toUpperCase())).length;
+  const warnLogs = logs.filter((l) => String(l.log_level).toUpperCase() === 'WARN').length;
+  const unhealthyProbes = healthSignals.filter((h) => String(h.status).toUpperCase() === 'UNHEALTHY').length;
+
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: var(--radius-sm);">
+        <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Critical Errors</span>
+        <span class="badge ${errorLogs > 0 ? 'badge-critical' : 'badge-healthy'}">${errorLogs} Errors</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: var(--radius-sm);">
+        <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Warning Signals</span>
+        <span class="badge ${warnLogs > 0 ? 'badge-warning' : 'badge-healthy'}">${warnLogs} Warnings</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: var(--radius-sm);">
+        <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Probe Outages</span>
+        <span class="badge ${unhealthyProbes > 0 ? 'badge-critical' : 'badge-healthy'}">${unhealthyProbes} Unhealthy</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: var(--radius-sm);">
+        <span class="font-mono" style="font-size: 11px; color: var(--text-muted);">Change Events</span>
+        <span class="badge ${deployments.length > 0 ? 'badge-warning' : 'badge-info'}">${deployments.length} Deploys</span>
       </div>
     </div>
   `;
@@ -172,6 +230,8 @@ function updateIncidentSummary(scenarioData) {
   if (countsEl) {
     countsEl.textContent = `${info.logsCount} logs · ${info.metricsCount} metrics · ${info.deploymentsCount} deployments`;
   }
+
+  updateTelemetryLeftPane(scenarioData);
 }
 
 /**

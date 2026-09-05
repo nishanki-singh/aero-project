@@ -1,0 +1,526 @@
+/* AERO Telemetry & Evidence Workspace Stylesheet (Stage 4B) */
+
+/* ==========================================================================
+   Workspace Sub-layout & Container
+   ========================================================================== */
+.telemetry-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.section-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-subtitle {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Golden Signal Metrics Grid & Charts
+   ========================================================================== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.metric-card {
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 4px 20px var(--accent-cyan-glow);
+}
+
+.metric-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.metric-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.metric-service-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.metric-stats-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.metric-current-val {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent-cyan-light);
+  line-height: 1;
+}
+
+.metric-current-val.critical {
+  color: var(--status-critical);
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.metric-current-val.warning {
+  color: var(--status-warning);
+}
+
+.metric-unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.metric-stat-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* SVG Chart Container */
+.chart-container {
+  width: 100%;
+  height: 140px;
+  position: relative;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart-grid-line {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-dasharray: 2 4;
+}
+
+.chart-axis-text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-muted);
+}
+
+.chart-threshold-line {
+  stroke: var(--status-critical);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--accent-cyan);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-line.critical {
+  stroke: var(--status-critical);
+}
+
+.chart-area {
+  fill: url(#cyan-gradient);
+  opacity: 0.25;
+}
+
+.chart-area.critical {
+  fill: url(#critical-gradient);
+  opacity: 0.3;
+}
+
+.chart-point {
+  fill: var(--accent-cyan);
+  stroke: var(--bg-primary);
+  stroke-width: 2;
+  transition: r var(--transition-fast);
+}
+
+.chart-point:hover {
+  r: 5;
+  fill: #ffffff;
+}
+
+/* Chart Tooltip */
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  z-index: 100;
+  white-space: nowrap;
+  display: none;
+}
+
+/* ==========================================================================
+   Log Evidence Explorer
+   ========================================================================== */
+.logs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.logs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.logs-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+}
+
+.logs-search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.logs-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.filter-chip.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan-light);
+  font-weight: 600;
+}
+
+.filter-chip.active.fatal,
+.filter-chip.active.error {
+  background: var(--status-critical-bg);
+  border-color: var(--status-critical-border);
+  color: var(--status-critical);
+}
+
+.filter-chip.active.warn {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+  color: var(--status-warning);
+}
+
+.filter-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.filter-toggle-label input {
+  cursor: pointer;
+}
+
+/* Logs Table Container */
+.logs-table-wrapper {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(10, 14, 23, 0.6);
+}
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.logs-table th {
+  background: var(--bg-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+  text-transform: uppercase;
+}
+
+.logs-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: top;
+}
+
+.log-row {
+  transition: background var(--transition-fast);
+}
+
+.log-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.log-row.evidence-highlight {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid var(--status-critical);
+}
+
+.log-row.evidence-highlight:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.log-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.log-service {
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+.log-message {
+  color: var(--text-primary);
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.log-evidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--status-critical);
+  background: rgba(239, 68, 68, 0.2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+}
+
+.log-attrs-toggle {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: 6px;
+  text-decoration: underline;
+}
+
+.log-attrs-panel {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Deployment & Change Evidence Panel
+   ========================================================================== */
+.deployment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deployment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deployment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.deployment-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-light);
+}
+
+.deployment-item.onset-trigger {
+  border-left: 4px solid var(--status-warning);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.deployment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deployment-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.deployment-version {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.deployment-commit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.deployment-summary-text {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.deployment-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Service Health Monitor Component
+   ========================================================================== */
+.health-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.health-stat-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-stat-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.health-stat-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.health-stat-value.healthy { color: var(--status-healthy); }
+.health-stat-value.degraded { color: var(--status-warning); }
+.health-stat-value.unhealthy { color: var(--status-critical); }
