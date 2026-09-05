@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -30,9 +31,9 @@ class LogEntry(BaseModel):
     service_name: str = Field(..., description="Name of the originating microservice.")
     log_level: LogLevel = Field(..., description="Severity level.")
     message: str = Field(..., description="Log message or stack trace.")
-    trace_id: Optional[str] = Field(default=None, description="Distributed tracing identifier.")
-    span_id: Optional[str] = Field(default=None, description="Span identifier.")
-    attributes: Dict[str, Any] = Field(default_factory=dict, description="Structured key-value context.")
+    trace_id: str | None = Field(default=None, description="Distributed tracing identifier.")
+    span_id: str | None = Field(default=None, description="Span identifier.")
+    attributes: dict[str, Any] = Field(default_factory=dict, description="Structured key-value context.")
 
 
 class MetricPoint(BaseModel):
@@ -46,8 +47,8 @@ class MetricSeries(BaseModel):
     metric_name: str = Field(..., description="Unique metric identifier (e.g., container/memory_utilization).")
     service_name: str = Field(..., description="Microservice associated with this metric.")
     unit: str = Field(..., description="Measurement unit (e.g., percent, count, ms, bytes).")
-    points: List[MetricPoint] = Field(default_factory=list, description="Ordered time series sample points.")
-    labels: Dict[str, str] = Field(default_factory=dict, description="Metric metadata labels.")
+    points: list[MetricPoint] = Field(default_factory=list, description="Ordered time series sample points.")
+    labels: dict[str, str] = Field(default_factory=dict, description="Metric metadata labels.")
 
 
 class DeploymentEvent(BaseModel):
@@ -68,4 +69,4 @@ class ServiceHealth(BaseModel):
     status: HealthStatus = Field(..., description="Operational status.")
     latency_p99_ms: float = Field(..., description="P99 response latency in milliseconds.")
     error_rate_pct: float = Field(..., description="HTTP 5xx or error response percentage (0-100).")
-    details: Optional[str] = Field(default=None, description="Additional status message.")
+    details: str | None = Field(default=None, description="Additional status message.")

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import random
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
 
 from src.schemas.telemetry import (
-    DeploymentEvent,
     HealthStatus,
     LogEntry,
     LogLevel,
@@ -20,18 +18,18 @@ from src.schemas.telemetry import (
 class SyntheticIncidentGenerator:
     """Engine for generating correlated multi-signal telemetry with deterministic seeds and background noise."""
 
-    def __init__(self, seed: int = 42, base_time: Optional[datetime] = None):
+    def __init__(self, seed: int = 42, base_time: datetime | None = None):
         self.seed = seed
         self.rng = random.Random(seed)
         self.base_time = base_time or datetime(2026, 8, 30, 14, 0, 0, tzinfo=timezone.utc)
 
     def generate_background_logs(
         self,
-        services: List[str],
+        services: list[str],
         start_time: datetime,
         duration_minutes: int = 25,
         logs_per_minute: int = 2,
-    ) -> List[LogEntry]:
+    ) -> list[LogEntry]:
         """Generates realistic healthy background INFO/DEBUG logs across microservices."""
         sample_messages = [
             "Processed HTTP GET /healthz 200 OK in 2.1ms",
@@ -41,7 +39,7 @@ class SyntheticIncidentGenerator:
             "Executed periodic garbage collection cycle",
             "Retrieved cached user session from memory",
         ]
-        logs: List[LogEntry] = []
+        logs: list[LogEntry] = []
         for minute in range(duration_minutes):
             current_time = start_time + timedelta(minutes=minute)
             for svc in services:
@@ -72,7 +70,7 @@ class SyntheticIncidentGenerator:
         jitter: float = 3.0,
     ) -> MetricSeries:
         """Generates healthy baseline metric time-series with small random jitter."""
-        points: List[MetricPoint] = []
+        points: list[MetricPoint] = []
         for minute in range(duration_minutes):
             t = start_time + timedelta(minutes=minute)
             val = max(0.0, base_value + self.rng.uniform(-jitter, jitter))
@@ -87,12 +85,12 @@ class SyntheticIncidentGenerator:
 
     def generate_baseline_health(
         self,
-        services: List[str],
+        services: list[str],
         start_time: datetime,
         duration_minutes: int = 25,
-    ) -> List[ServiceHealth]:
+    ) -> list[ServiceHealth]:
         """Generates healthy baseline ServiceHealth records every 2 minutes."""
-        health_records: List[ServiceHealth] = []
+        health_records: list[ServiceHealth] = []
         for minute in range(0, duration_minutes, 2):
             t = start_time + timedelta(minutes=minute)
             for svc in services:

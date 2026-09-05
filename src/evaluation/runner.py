@@ -5,32 +5,37 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 from src.benchmark.scenarios import BENCHMARK_SCENARIOS
 from src.config import config
-from src.engine.diagnostic_engine import MockDiagnosticEngine, VertexAiDiagnosticEngine, get_diagnostic_engine
-from src.evaluation.evaluator import BenchmarkEvaluationReport, IncidentEvaluator, ScenarioEvaluationResult
+from src.engine.diagnostic_engine import (
+    MockDiagnosticEngine,
+    VertexAiDiagnosticEngine,
+)
+from src.evaluation.evaluator import (
+    BenchmarkEvaluationReport,
+    IncidentEvaluator,
+)
 from src.schemas.ground_truth import BenchmarkScenarioBundle
 
 
 def run_benchmark_evaluation(
     use_live_vertex: bool = False,
-    scenario_filter: Optional[str] = None,
+    scenario_filter: str | None = None,
     seed: int = 42,
-    output_json: Optional[str] = None,
+    output_json: str | None = None,
 ) -> BenchmarkEvaluationReport:
     """Executes the AI diagnostic evaluation pipeline across benchmark scenarios."""
     engine = VertexAiDiagnosticEngine() if use_live_vertex else MockDiagnosticEngine()
     engine_name = f"Vertex AI Gemini ({config.reasoning_model})" if use_live_vertex else "Deterministic Mock Engine"
 
     print("\n" + "=" * 90)
-    print(f"[AERO] AI DIAGNOSTIC BENCHMARK EVALUATION")
+    print("[AERO] AI DIAGNOSTIC BENCHMARK EVALUATION")
     print(f"[AERO] Provider: {engine_name} | Random Seed: {seed}")
     print("=" * 90)
 
     # 1. Load Scenarios
-    bundles: List[BenchmarkScenarioBundle] = []
+    bundles: list[BenchmarkScenarioBundle] = []
     scenarios_to_run = (
         {scenario_filter: BENCHMARK_SCENARIOS[scenario_filter]}
         if scenario_filter and scenario_filter in BENCHMARK_SCENARIOS
@@ -41,7 +46,7 @@ def run_benchmark_evaluation(
         print(f"[ERROR] Unknown scenario '{scenario_filter}'. Available: {list(BENCHMARK_SCENARIOS.keys())}")
         sys.exit(1)
 
-    for name, gen_fn in scenarios_to_run.items():
+    for gen_fn in scenarios_to_run.values():
         bundle = gen_fn(seed=seed)
         bundles.append(bundle)
 

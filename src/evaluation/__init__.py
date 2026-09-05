@@ -7,7 +7,7 @@ from src.evaluation.evaluator import (
 )
 
 __all__ = [
-    "ScenarioEvaluationResult",
     "BenchmarkEvaluationReport",
     "IncidentEvaluator",
+    "ScenarioEvaluationResult",
 ]

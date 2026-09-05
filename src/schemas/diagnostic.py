@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -29,7 +29,7 @@ class SupportingEvidence(BaseModel):
     timestamp: datetime = Field(..., description="Timestamp when evidence occurred.")
     source: str = Field(..., description="Originating entity (e.g., pod name, metric name, deploy hash).")
     content: str = Field(..., description="Verbatim or summarized observation extracted from telemetry.")
-    relevance: Optional[str] = Field(default=None, description="Explanation of why this supports the diagnosis.")
+    relevance: str | None = Field(default=None, description="Explanation of why this supports the diagnosis.")
 
 
 class ProbableRootCause(BaseModel):
@@ -37,7 +37,7 @@ class ProbableRootCause(BaseModel):
     title: str = Field(..., description="Short canonical title of the root cause.")
     description: str = Field(..., description="Detailed causal explanation distinguishing trigger from symptoms.")
     category: str = Field(..., description="Root cause taxonomy category (e.g., RESOURCE_EXHAUSTION_MEMORY).")
-    trigger_event: Optional[str] = Field(default=None, description="Specific trigger initiating the failure sequence.")
+    trigger_event: str | None = Field(default=None, description="Specific trigger initiating the failure sequence.")
 
 
 class ConfidenceLevel(BaseModel):
@@ -57,8 +57,8 @@ class HistoricalIncidentMatch(BaseModel):
 
 class RecommendedRemediation(BaseModel):
     """Human-in-the-loop remediation proposal."""
-    immediate_steps: List[str] = Field(..., description="Step-by-step mitigation actions for on-call engineer.")
-    dry_run_command: Optional[str] = Field(default=None, description="Safe verification or dry-run CLI command.")
+    immediate_steps: list[str] = Field(..., description="Step-by-step mitigation actions for on-call engineer.")
+    dry_run_command: str | None = Field(default=None, description="Safe verification or dry-run CLI command.")
     verification_metric: str = Field(..., description="Metric or signal confirming operational recovery.")
     rollback_plan: str = Field(..., description="Contingency rollback procedure if mitigation fails.")
 
@@ -78,9 +78,9 @@ class AeroDiagnosticReport(BaseModel):
     incident_summary: str = Field(..., description="Executive summary of incident onset and impact.")
     probable_root_cause: ProbableRootCause = Field(..., description="Identified root cause.")
     confidence_level: ConfidenceLevel = Field(..., description="Confidence assessment.")
-    supporting_evidence: List[SupportingEvidence] = Field(default_factory=list, description="Citations to evidence.")
-    similar_historical_incidents: List[HistoricalIncidentMatch] = Field(
+    supporting_evidence: list[SupportingEvidence] = Field(default_factory=list, description="Citations to evidence.")
+    similar_historical_incidents: list[HistoricalIncidentMatch] = Field(
         default_factory=list, description="Retrieved similar historical incidents from Engineering Memory."
     )
     recommended_remediation: RecommendedRemediation = Field(..., description="Actionable mitigation checklist.")
-    relevant_runbook: Optional[RunbookReference] = Field(default=None, description="Relevant runbook section.")
+    relevant_runbook: RunbookReference | None = Field(default=None, description="Relevant runbook section.")

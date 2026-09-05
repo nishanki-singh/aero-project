@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import abc
-import json
 import logging
-from typing import Optional
+
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config import config
-from src.engine.correlator import CorrelatedTelemetrySummary, TelemetryCorrelator
+from src.engine.correlator import TelemetryCorrelator
 from src.engine.prompts import SYSTEM_INSTRUCTION, build_diagnostic_prompt
 from src.schemas.diagnostic import (
     AeroDiagnosticReport,
@@ -38,7 +37,6 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
     """Deterministic diagnostic provider for offline testing, CI, and evaluation."""
 
     def diagnose(self, incident: Incident) -> AeroDiagnosticReport:
-        summary = TelemetryCorrelator.correlate(incident)
         meta = incident.metadata
         svc = meta.affected_service
 
@@ -408,48 +406,55 @@ class VertexAiDiagnosticEngine(BaseDiagnosticEngine):
 
     def __init__(
         self,
-        project_id: Optional[str] = None,
-        region: Optional[str] = None,
-        model_name: Optional[str] = None,
+        project_id: str | None = None,
+        region: str | None = None,
+        model_name: str | None = None,
     ):
         self.project_id = project_id or config.project_id
         self.region = region or config.region
         self.model_name = model_name or config.reasoning_model
-        self._initialized = False
+        self._client = None
 
     def _ensure_init(self) -> None:
-        if not self._initialized:
-            import vertexai
-            vertexai.init(project=self.project_id, location=self.region)
-            self._initialized = True
+        if self._client is None:
+            from google import genai
+            self._client = genai.Client(
+                vertexai=True,
+                project=self.project_id,
+                location=self.region,
+            )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def diagnose(self, incident: Incident) -> AeroDiagnosticReport:
         self._ensure_init()
-        from vertexai.generative_models import GenerativeModel, GenerationConfig
+        assert self._client is not None
+        from google.genai import types
 
         summary = TelemetryCorrelator.correlate(incident)
         prompt = build_diagnostic_prompt(incident, summary)
 
-        model = GenerativeModel(
-            model_name=self.model_name,
-            system_instruction=[SYSTEM_INSTRUCTION],
-        )
-
-        generation_config = GenerationConfig(
-            response_mime_type="application/json",
-            response_schema=AeroDiagnosticReport.model_json_schema(),
-            temperature=0.1,
-        )
-
         logger.info(f"Invoking Vertex AI Gemini ({self.model_name}) for incident {incident.metadata.incident_id}")
-        response = model.generate_content(prompt, generation_config=generation_config)
+        response = self._client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=AeroDiagnosticReport,
+                temperature=0.1,
+            ),
+        )
 
-        report_json = response.text
-        return AeroDiagnosticReport.model_validate_json(report_json)
+        report_text = response.text or ""
+        if report_text.startswith("```json"):
+            report_text = report_text.removeprefix("```json").removesuffix("```").strip()
+        elif report_text.startswith("```"):
+            report_text = report_text.removeprefix("```").removesuffix("```").strip()
+
+        return AeroDiagnosticReport.model_validate_json(report_text)
 
 
-def get_diagnostic_engine(provider: Optional[str] = None) -> BaseDiagnosticEngine:
+def get_diagnostic_engine(provider: str | None = None) -> BaseDiagnosticEngine:
     """Factory creating the appropriate diagnostic engine instance."""
     mode = provider or config.diagnostic_provider
     if mode == "vertex":

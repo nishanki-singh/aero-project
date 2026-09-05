@@ -1,6 +1,7 @@
 """Unit tests for the synthetic incident generator engine."""
 
 from datetime import datetime, timezone
+
 from src.benchmark.generator import SyntheticIncidentGenerator
 
 

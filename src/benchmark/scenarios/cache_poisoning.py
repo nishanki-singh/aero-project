@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta
 
 from src.benchmark.generator import SyntheticIncidentGenerator
 from src.schemas.diagnostic import SignalType
@@ -33,7 +32,7 @@ from src.schemas.telemetry import (
 
 def generate_cache_poisoning_scenario(
     seed: int = 42,
-    base_time: Optional[datetime] = None,
+    base_time: datetime | None = None,
 ) -> BenchmarkScenarioBundle:
     """Generates the Cache Stampede / Cache Key Corruption scenario."""
     gen = SyntheticIncidentGenerator(seed=seed, base_time=base_time)
@@ -42,13 +41,13 @@ def generate_cache_poisoning_scenario(
     other_services = ["auth-service", "order-service", "worker-service", "payment-service"]
 
     # 1. Background Telemetry
-    logs: List[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
-    metrics: List[MetricSeries] = []
-    health_signals: List[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
+    logs: list[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
+    metrics: list[MetricSeries] = []
+    health_signals: list[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
 
     # 2. Deployment Event
     deploy_time = t0 + timedelta(minutes=2)
-    deployments: List[DeploymentEvent] = [
+    deployments: list[DeploymentEvent] = [
         DeploymentEvent(
             timestamp=deploy_time,
             service_name=service,
@@ -62,7 +61,7 @@ def generate_cache_poisoning_scenario(
 
     # 3. Specific Metrics
     # Redis Cache Hit Ratio Metric (Collapses from 98.5% to 1.8%)
-    cache_hit_points: List[MetricPoint] = []
+    cache_hit_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 98.5 if m < 3 else (1.8 + gen.rng.uniform(-0.5, 0.5))
@@ -79,7 +78,7 @@ def generate_cache_poisoning_scenario(
     )
 
     # Database CPU Utilization (Spikes to 100% due to cache stampede)
-    db_cpu_points: List[MetricPoint] = []
+    db_cpu_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         if m < 3:

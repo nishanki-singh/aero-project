@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 from src.benchmark.scenarios import BENCHMARK_SCENARIOS
 from src.config import config
 
 
 def export_benchmark_datasets(
-    output_dir: Optional[str] = None,
+    output_dir: str | None = None,
     seed: int = 42,
     export_format: str = "both",
 ) -> None:
@@ -102,7 +100,7 @@ def inspect_scenario(name: str, seed: int = 42) -> None:
         mand = "[MANDATORY]" if ev.is_mandatory else "[OPTIONAL]"
         print(f"  {idx}. {mand} [{ev.signal_type.value}] Pattern: '{ev.pattern}'")
         print(f"     Reason: {ev.description}")
-    print(f"\n- Expected Key Remediation Actions:")
+    print("\n- Expected Key Remediation Actions:")
     for act in gt.expected_remediation.key_actions:
         print(f"  * {act}")
     print(f"- Recovery Metric: {gt.expected_remediation.expected_verification_metric}")

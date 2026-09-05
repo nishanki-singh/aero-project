@@ -3,7 +3,6 @@
 **Project Name:** AERO (AI-Enabled Reliability & Operations)  
 **Tagline:** AI-Powered Cloud Reliability Copilot  
 **Program:** Google Patchamomma 2026  
-**Status:** Approved Blueprint  
 **Target Milestone:** MVP Checkpoint (September 5, 2026)  
 
 ---

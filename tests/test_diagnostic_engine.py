@@ -2,7 +2,11 @@
 
 from src.benchmark.scenarios.config_drift import generate_config_drift_scenario
 from src.engine.correlator import TelemetryCorrelator
-from src.engine.diagnostic_engine import MockDiagnosticEngine, VertexAiDiagnosticEngine, get_diagnostic_engine
+from src.engine.diagnostic_engine import (
+    MockDiagnosticEngine,
+    VertexAiDiagnosticEngine,
+    get_diagnostic_engine,
+)
 from src.engine.prompts import build_diagnostic_prompt
 from src.schemas.diagnostic import AeroDiagnosticReport
 

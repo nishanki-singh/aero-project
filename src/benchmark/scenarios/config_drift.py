@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta
 
 from src.benchmark.generator import SyntheticIncidentGenerator
 from src.schemas.diagnostic import SignalType
@@ -33,7 +32,7 @@ from src.schemas.telemetry import (
 
 def generate_config_drift_scenario(
     seed: int = 42,
-    base_time: Optional[datetime] = None,
+    base_time: datetime | None = None,
 ) -> BenchmarkScenarioBundle:
     """Generates the Configuration Drift scenario."""
     gen = SyntheticIncidentGenerator(seed=seed, base_time=base_time)
@@ -42,13 +41,13 @@ def generate_config_drift_scenario(
     other_services = ["order-service", "worker-service", "payment-service", "catalog-service"]
 
     # 1. Background Telemetry
-    logs: List[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
-    metrics: List[MetricSeries] = []
-    health_signals: List[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
+    logs: list[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
+    metrics: list[MetricSeries] = []
+    health_signals: list[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
 
     # 2. Deployment / Config Event
     config_time = t0 + timedelta(minutes=2)
-    deployments: List[DeploymentEvent] = [
+    deployments: list[DeploymentEvent] = [
         DeploymentEvent(
             timestamp=config_time,
             service_name=service,
@@ -62,7 +61,7 @@ def generate_config_drift_scenario(
 
     # 3. Specific Metrics
     # JWT Failure Rate Metric
-    jwt_fail_points: List[MetricPoint] = []
+    jwt_fail_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 0.02 if m < 3 else (99.2 + gen.rng.uniform(-0.5, 0.5))
@@ -79,7 +78,7 @@ def generate_config_drift_scenario(
     )
 
     # HTTP 401 Error Rate Metric
-    http_401_points: List[MetricPoint] = []
+    http_401_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 0.05 if m < 3 else (97.8 + gen.rng.uniform(-1.0, 1.0))

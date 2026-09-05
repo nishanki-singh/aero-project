@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta
 
 from src.benchmark.generator import SyntheticIncidentGenerator
 from src.schemas.diagnostic import SignalType
@@ -33,7 +32,7 @@ from src.schemas.telemetry import (
 
 def generate_db_pool_exhaustion_scenario(
     seed: int = 42,
-    base_time: Optional[datetime] = None,
+    base_time: datetime | None = None,
 ) -> BenchmarkScenarioBundle:
     """Generates the Database Connection Pool Exhaustion scenario."""
     gen = SyntheticIncidentGenerator(seed=seed, base_time=base_time)
@@ -42,13 +41,13 @@ def generate_db_pool_exhaustion_scenario(
     other_services = ["auth-service", "worker-service", "payment-service", "catalog-service"]
 
     # 1. Background Telemetry
-    logs: List[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
-    metrics: List[MetricSeries] = []
-    health_signals: List[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
+    logs: list[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
+    metrics: list[MetricSeries] = []
+    health_signals: list[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
 
     # 2. Deployment Event
     deploy_time = t0 + timedelta(minutes=3)
-    deployments: List[DeploymentEvent] = [
+    deployments: list[DeploymentEvent] = [
         DeploymentEvent(
             timestamp=deploy_time,
             service_name=service,
@@ -62,7 +61,7 @@ def generate_db_pool_exhaustion_scenario(
 
     # 3. Specific Metrics
     # Active DB Connections Metric (Max pool size: 20)
-    db_conn_points: List[MetricPoint] = []
+    db_conn_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         if m < 4:
@@ -84,7 +83,7 @@ def generate_db_pool_exhaustion_scenario(
     )
 
     # HTTP 504 Error Rate
-    error_points: List[MetricPoint] = []
+    error_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 0.0 if m < 6 else (96.0 + gen.rng.uniform(-2.0, 2.0))

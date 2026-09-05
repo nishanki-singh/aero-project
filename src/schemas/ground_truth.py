@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from src.schemas.diagnostic import SignalType
@@ -19,7 +20,7 @@ class ExpectedEvidence(BaseModel):
 
 class ExpectedRemediation(BaseModel):
     """Ground-truth expected remediation actions and recovery verification."""
-    key_actions: List[str] = Field(..., description="Key phrases or actions required in the mitigation plan.")
+    key_actions: list[str] = Field(..., description="Key phrases or actions required in the mitigation plan.")
     expected_verification_metric: str = Field(..., description="Expected metric for verifying recovery.")
 
 
@@ -32,12 +33,12 @@ class GroundTruthScenario(BaseModel):
     trigger_event: str = Field(..., description="Specific event triggering the incident onset.")
     root_cause_summary: str = Field(..., description="True root cause summary for scoring.")
     expected_root_cause_category: str = Field(..., description="Canonical category for automated exact-match scoring.")
-    expected_evidence_signals: List[ExpectedEvidence] = Field(
+    expected_evidence_signals: list[ExpectedEvidence] = Field(
         default_factory=list, description="List of evidence signals the model is required to cite."
     )
     expected_remediation: ExpectedRemediation = Field(..., description="Expected mitigation plan attributes.")
     expected_diagnostic_conclusion: str = Field(..., description="Expected high-level diagnostic verdict.")
-    evaluation_criteria: Dict[str, Any] = Field(
+    evaluation_criteria: dict[str, Any] = Field(
         default_factory=dict, description="Metadata and scoring weights for benchmarking."
     )
 

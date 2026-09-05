@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from src.schemas.diagnostic import AeroDiagnosticReport, SignalType, SupportingEvidence
@@ -26,7 +24,7 @@ class GroundingVerificationResult(BaseModel):
     hallucination_rate: float = Field(..., description="Proportion of ungrounded citations (0.0 - 1.0).")
     grounding_precision: float = Field(..., description="Proportion of verified citations (0.0 - 1.0).")
     is_fully_grounded: bool
-    evidence_details: List[GroundedEvidenceItem] = Field(default_factory=list)
+    evidence_details: list[GroundedEvidenceItem] = Field(default_factory=list)
 
 
 class GroundingVerifier:
@@ -38,7 +36,7 @@ class GroundingVerifier:
     def verify(cls, report: AeroDiagnosticReport, incident: Incident) -> GroundingVerificationResult:
         """Verifies all evidence citations against the incident's raw telemetry."""
         telemetry = incident.telemetry
-        details: List[GroundedEvidenceItem] = []
+        details: list[GroundedEvidenceItem] = []
 
         for ev in report.supporting_evidence:
             item_result = cls._verify_single_evidence(ev, telemetry)

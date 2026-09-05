@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta
 
 from src.benchmark.generator import SyntheticIncidentGenerator
 from src.schemas.diagnostic import SignalType
@@ -33,7 +32,7 @@ from src.schemas.telemetry import (
 
 def generate_oom_kill_scenario(
     seed: int = 42,
-    base_time: Optional[datetime] = None,
+    base_time: datetime | None = None,
 ) -> BenchmarkScenarioBundle:
     """Generates the OOMKill scenario with correlated logs, metrics, health signals, and ground truth."""
     gen = SyntheticIncidentGenerator(seed=seed, base_time=base_time)
@@ -42,10 +41,10 @@ def generate_oom_kill_scenario(
     other_services = ["auth-service", "order-service", "payment-service", "catalog-service"]
 
     # 1. Background Telemetry
-    logs: List[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
-    metrics: List[MetricSeries] = []
-    health_signals: List[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
-    deployments: List[DeploymentEvent] = [
+    logs: list[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
+    metrics: list[MetricSeries] = []
+    health_signals: list[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
+    deployments: list[DeploymentEvent] = [
         DeploymentEvent(
             timestamp=t0 - timedelta(minutes=45),
             service_name=service,
@@ -59,7 +58,7 @@ def generate_oom_kill_scenario(
 
     # 2. Specific Incident Telemetry Progression
     # Memory Ramp Metric
-    memory_points: List[MetricPoint] = []
+    memory_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         if m < 5:
@@ -83,7 +82,7 @@ def generate_oom_kill_scenario(
     )
 
     # HTTP 502 Error Rate Metric
-    error_points: List[MetricPoint] = []
+    error_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 0.0 if m < 13 else (94.5 + gen.rng.uniform(-2.0, 2.0))

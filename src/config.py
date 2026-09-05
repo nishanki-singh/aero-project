@@ -7,6 +7,7 @@ All models are fully configurable via environment variables without hardcoded le
 from __future__ import annotations
 
 import os
+
 from pydantic import BaseModel, Field
 
 
@@ -15,7 +16,7 @@ class AeroConfig(BaseModel):
 
     # Google Cloud Project & Region
     project_id: str = Field(
-        default_factory=lambda: os.getenv("GOOGLE_CLOUD_PROJECT", "aero-demo-project"),
+        default_factory=lambda: os.getenv("GOOGLE_CLOUD_PROJECT", "project-a47199cc-a109-4cd5-917"),
         description="Google Cloud Project ID for Vertex AI and cloud services.",
     )
     region: str = Field(

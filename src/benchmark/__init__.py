@@ -11,11 +11,11 @@ from src.benchmark.scenarios import (
 )
 
 __all__ = [
-    "SyntheticIncidentGenerator",
     "BENCHMARK_SCENARIOS",
-    "generate_oom_kill_scenario",
-    "generate_db_pool_exhaustion_scenario",
-    "generate_config_drift_scenario",
-    "generate_dependency_deadlock_scenario",
+    "SyntheticIncidentGenerator",
     "generate_cache_poisoning_scenario",
+    "generate_config_drift_scenario",
+    "generate_db_pool_exhaustion_scenario",
+    "generate_dependency_deadlock_scenario",
+    "generate_oom_kill_scenario",
 ]

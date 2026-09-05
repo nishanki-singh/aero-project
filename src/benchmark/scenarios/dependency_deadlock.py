@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta
 
 from src.benchmark.generator import SyntheticIncidentGenerator
 from src.schemas.diagnostic import SignalType
@@ -33,7 +32,7 @@ from src.schemas.telemetry import (
 
 def generate_dependency_deadlock_scenario(
     seed: int = 42,
-    base_time: Optional[datetime] = None,
+    base_time: datetime | None = None,
 ) -> BenchmarkScenarioBundle:
     """Generates the Dependency Latency & Thread Pool Starvation scenario."""
     gen = SyntheticIncidentGenerator(seed=seed, base_time=base_time)
@@ -42,14 +41,14 @@ def generate_dependency_deadlock_scenario(
     other_services = ["auth-service", "order-service", "worker-service", "catalog-service"]
 
     # 1. Background Telemetry
-    logs: List[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
-    metrics: List[MetricSeries] = []
-    health_signals: List[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
-    deployments: List[DeploymentEvent] = []
+    logs: list[LogEntry] = gen.generate_background_logs(other_services + [service], t0, duration_minutes=25)
+    metrics: list[MetricSeries] = []
+    health_signals: list[ServiceHealth] = gen.generate_baseline_health(other_services, t0, duration_minutes=25)
+    deployments: list[DeploymentEvent] = []
 
     # 2. Specific Incident Metrics
     # Upstream Dependency Latency Metric
-    partner_lat_points: List[MetricPoint] = []
+    partner_lat_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 180.0 if m < 4 else (28500.0 + gen.rng.uniform(-1000.0, 1000.0))
@@ -66,7 +65,7 @@ def generate_dependency_deadlock_scenario(
     )
 
     # Active Worker Threads (Max capacity: 100)
-    thread_points: List[MetricPoint] = []
+    thread_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         if m < 4:
@@ -88,7 +87,7 @@ def generate_dependency_deadlock_scenario(
     )
 
     # CPU Utilization (Drops to near-zero as all threads are blocked waiting for network I/O)
-    cpu_points: List[MetricPoint] = []
+    cpu_points: list[MetricPoint] = []
     for m in range(25):
         t = t0 + timedelta(minutes=m)
         val = 28.0 if m < 5 else (2.1 + gen.rng.uniform(-0.5, 0.5))

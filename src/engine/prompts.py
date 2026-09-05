@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+
 from src.engine.correlator import CorrelatedTelemetrySummary
 from src.schemas.incident import Incident
-
 
 SYSTEM_INSTRUCTION = """You are AERO (AI-Enabled Reliability & Operations), an expert Google Cloud Site Reliability Engineering (SRE) Copilot.
 Your objective is to diagnose cloud-native production incidents by performing rigorous causal reasoning over multi-signal telemetry.
@@ -107,6 +106,6 @@ def build_diagnostic_prompt(incident: Incident, summary: CorrelatedTelemetrySumm
 2. Formulate a structured diagnostic report conforming strictly to the requested JSON schema.
 3. In `supporting_evidence`, cite ONLY timestamps, messages, and metrics that appear verbatim in the telemetry above.
 4. Calculate a confidence score (0.0 to 1.0) and confidence rating (HIGH, MEDIUM, LOW) with clear justification.
-5. Formulate a step-by-step remediation plan with dry-run commands and recovery verification metrics.
+5. In `recommended_remediation`, formulate a clear, actionable mitigation checklist covering immediate stabilization actions (such as rollback, restart, resource scaling, or configuration fix), concrete `dry_run_command`, observable `verification_metric`, and `rollback_plan`.
 """
     return prompt

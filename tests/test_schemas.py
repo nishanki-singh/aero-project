@@ -1,6 +1,7 @@
 """Unit tests for AERO Pydantic schemas."""
 
 from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
@@ -14,12 +15,6 @@ from src.schemas.diagnostic import (
     RunbookReference,
     SignalType,
     SupportingEvidence,
-)
-from src.schemas.ground_truth import (
-    BenchmarkScenarioBundle,
-    ExpectedEvidence,
-    ExpectedRemediation,
-    GroundTruthScenario,
 )
 from src.schemas.incident import (
     Incident,

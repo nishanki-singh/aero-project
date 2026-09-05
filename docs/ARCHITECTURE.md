@@ -2,8 +2,7 @@
 
 **System Name:** AERO (AI-Enabled Reliability & Operations)  
 **Document Type:** System Architecture Document (SAD)  
-**Program:** Google Patchamomma 2026  
-**Status:** Approved Blueprint  
+**Program:** Google Patchamomma 2026   
 
 ---
 

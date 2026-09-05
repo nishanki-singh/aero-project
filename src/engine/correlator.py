@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
-from src.schemas.incident import Incident, TelemetryPayload
+from src.schemas.incident import Incident
 from src.schemas.telemetry import (
     DeploymentEvent,
     HealthStatus,
     LogEntry,
     LogLevel,
-    MetricSeries,
     ServiceHealth,
 )
 
@@ -38,7 +36,7 @@ class MetricAnomaly(BaseModel):
     peak_value: float
     delta_pct: float
     description: str
-    labels: Dict[str, str] = Field(default_factory=dict)
+    labels: dict[str, str] = Field(default_factory=dict)
 
 
 class CorrelatedTelemetrySummary(BaseModel):
@@ -48,11 +46,11 @@ class CorrelatedTelemetrySummary(BaseModel):
     time_window_start: datetime
     time_window_end: datetime
     total_raw_logs: int
-    error_clusters: List[ErrorLogCluster]
-    metric_anomalies: List[MetricAnomaly]
-    recent_deployments: List[DeploymentEvent]
-    health_degradations: List[ServiceHealth]
-    unaffected_services: List[str]
+    error_clusters: list[ErrorLogCluster]
+    metric_anomalies: list[MetricAnomaly]
+    recent_deployments: list[DeploymentEvent]
+    health_degradations: list[ServiceHealth]
+    unaffected_services: list[str]
 
 
 class TelemetryCorrelator:
@@ -70,14 +68,14 @@ class TelemetryCorrelator:
             if log.log_level in (LogLevel.WARN, LogLevel.ERROR, LogLevel.FATAL)
         ]
 
-        clusters: Dict[str, List[LogEntry]] = {}
+        clusters: dict[str, list[LogEntry]] = {}
         for log in error_logs:
             # Cluster key: service + first 40 chars of message (or error class attribute)
             err_class = log.attributes.get("error_class") or log.attributes.get("reason")
             key = f"{log.service_name}:{log.log_level.value}:{err_class or log.message[:45]}"
             clusters.setdefault(key, []).append(log)
 
-        error_clusters: List[ErrorLogCluster] = []
+        error_clusters: list[ErrorLogCluster] = []
         for key, logs in clusters.items():
             first_log = min(logs, key=lambda x: x.timestamp)
             last_log = max(logs, key=lambda x: x.timestamp)
@@ -95,12 +93,11 @@ class TelemetryCorrelator:
         error_clusters.sort(key=lambda x: x.count, reverse=True)
 
         # 2. Extract Metric Anomalies
-        metric_anomalies: List[MetricAnomaly] = []
+        metric_anomalies: list[MetricAnomaly] = []
         for series in telemetry.metrics:
             if not series.points:
                 continue
             values = [p.value for p in series.points]
-            min_val = min(values)
             max_val = max(values)
             baseline = values[0] if values else 0.0
 

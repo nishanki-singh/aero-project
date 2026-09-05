@@ -2,7 +2,6 @@
 
 from src.benchmark.scenarios.oom_kill import generate_oom_kill_scenario
 from src.engine.correlator import TelemetryCorrelator
-from src.schemas.telemetry import LogLevel
 
 
 def test_correlator_aggregates_signals():

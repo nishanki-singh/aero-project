@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from src.engine.diagnostic_engine import BaseDiagnosticEngine
 from src.engine.grounding_verifier import GroundingVerificationResult, GroundingVerifier
-from src.schemas.diagnostic import AeroDiagnosticReport, SignalType
-from src.schemas.ground_truth import BenchmarkScenarioBundle, GroundTruthScenario
+from src.schemas.diagnostic import AeroDiagnosticReport
+from src.schemas.ground_truth import BenchmarkScenarioBundle
 
 
 class ScenarioEvaluationResult(BaseModel):
@@ -48,7 +48,7 @@ class BenchmarkEvaluationReport(BaseModel):
     mean_overall_score: float
     total_duration_sec: float
     all_passed: bool
-    results: List[ScenarioEvaluationResult] = Field(default_factory=list)
+    results: list[ScenarioEvaluationResult] = Field(default_factory=list)
 
 
 class IncidentEvaluator:
@@ -147,14 +147,14 @@ class IncidentEvaluator:
     @classmethod
     def evaluate_benchmark_suite(
         cls,
-        bundles: List[BenchmarkScenarioBundle],
+        bundles: list[BenchmarkScenarioBundle],
         engine: BaseDiagnosticEngine,
     ) -> BenchmarkEvaluationReport:
         """Evaluates an entire suite of benchmark scenarios."""
         from datetime import datetime, timezone
 
         start_time = time.perf_counter()
-        results: List[ScenarioEvaluationResult] = []
+        results: list[ScenarioEvaluationResult] = []
 
         for b in bundles:
             res = cls.evaluate_scenario(b, engine)

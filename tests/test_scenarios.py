@@ -1,6 +1,7 @@
 """Unit tests for the 5 approved benchmark scenarios."""
 
 import pytest
+
 from src.benchmark.scenarios import BENCHMARK_SCENARIOS
 from src.schemas.diagnostic import SignalType
 
