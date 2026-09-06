@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.schemas import DiagnoseResponse, ScenarioSummaryResponse
+from src.api.schemas import (
+    DiagnoseResponse,
+    PostmortemResponse,
+    ScenarioSummaryResponse,
+)
 from src.api.service import AeroService
 from src.engine.diagnostic_engine import get_diagnostic_engine
 from src.evaluation.evaluator import IncidentEvaluator, ScenarioEvaluationResult
@@ -78,6 +82,20 @@ def get_scenario_evaluation(
         bundle = AeroService.get_scenario_bundle(scenario_key, seed=seed)
         engine = get_diagnostic_engine(provider=provider)
         return IncidentEvaluator.evaluate_scenario(bundle, engine)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{scenario_key}/postmortem", response_model=PostmortemResponse, summary="Get generated postmortem and markdown for scenario")
+def get_scenario_postmortem(
+    scenario_key: str,
+    provider: str | None = Query(default=None, description="Postmortem provider ('mock' or 'vertex')"),
+    seed: int = Query(default=42, description="Random seed"),
+) -> PostmortemResponse:
+    """Generates or retrieves a publication-ready Google SRE postmortem and Markdown report for a specific scenario."""
+    try:
+        bundle = AeroService.get_scenario_bundle(scenario_key, seed=seed)
+        return AeroService.generate_postmortem(bundle.incident, provider=provider)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

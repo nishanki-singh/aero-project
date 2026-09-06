@@ -27,6 +27,9 @@ class AppState {
         isRunning: false,
         completed: false
       },
+      activePostmortemData: null,
+      postmortemLoading: false,
+      postmortemError: null,
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',
@@ -34,6 +37,7 @@ class AppState {
       },
       isLoading: false,
       error: null
+
 
     };
 

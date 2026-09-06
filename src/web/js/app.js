@@ -11,6 +11,7 @@ import { renderTimelineWorkspace } from './components/timeline.js';
 import { renderRcaWorkspace } from './components/diagnostic.js';
 import { renderGroundingWorkspace } from './components/grounding_scorecard.js';
 import { renderRemediationWorkspace } from './components/remediation.js';
+import { renderPostmortemStudio } from './components/postmortem.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -45,10 +46,10 @@ const STAGE_META = {
     desc: 'Simulated execution environment for mitigation runbooks and scripts. Strictly isolated simulation with zero infrastructure mutation.'
   },
   postmortem: {
-    stage: 'Stage 4F',
-    title: 'Incident Postmortem & SRE Report',
+    stage: 'Stage 4E',
+    title: 'SRE Postmortem Studio & Export',
     icon: '📄',
-    desc: 'Actionable SRE postmortem document featuring 5-Whys analysis, timeline, lessons learned, and preventive action items with Markdown export.'
+    desc: 'Actionable Google SRE postmortem document featuring executive summary, 5-Whys analysis, timeline, lessons learned, and preventive action items with Markdown & JSON export.'
   },
   architecture: {
     stage: 'Stage 4H',
@@ -152,7 +153,13 @@ function renderActiveView(tabKey) {
     return;
   }
 
-  // Future Stages (4E-4H): Sleek placeholder containers
+  // Stage 4E: Fully rendered SRE Postmortem Studio for 'postmortem' tab
+  if (tabKey === 'postmortem') {
+    renderPostmortemStudio(container);
+    return;
+  }
+
+  // Future Stages (4F-4H): Sleek placeholder containers
   const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const info = extractScenarioInfo(state.activeScenarioData, state.activeScenarioKey);
 
@@ -278,13 +285,14 @@ export async function loadScenarioDetails(scenarioKey) {
       selectedMilestoneIndex: null
     });
 
-    // Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, and evaluation in parallel
-    const [scenarioData, timelineData, replayData, diagData, evalData] = await Promise.all([
+    // Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, evaluation, and postmortem in parallel
+    const [scenarioData, timelineData, replayData, diagData, evalData, postmortemData] = await Promise.all([
       api.getScenarioByKey(scenarioKey),
       api.getScenarioTimeline(scenarioKey),
       api.getScenarioReplay(scenarioKey, 60),
       api.getScenarioDiagnosis(scenarioKey),
-      api.getScenarioEvaluation(scenarioKey)
+      api.getScenarioEvaluation(scenarioKey),
+      api.getScenarioPostmortem(scenarioKey)
     ]);
 
     store.setState({
@@ -294,6 +302,7 @@ export async function loadScenarioDetails(scenarioKey) {
       activeReplayData: replayData,
       activeDiagnosisData: diagData,
       activeEvaluationData: evalData,
+      activePostmortemData: postmortemData,
       selectedWhyLevel: 1,
       remediationSimState: {
         status: 'idle',

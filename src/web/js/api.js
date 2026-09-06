@@ -150,6 +150,39 @@ export const api = {
       body: JSON.stringify({ incident, provider })
     });
     return handleResponse(res);
+  },
+
+  /**
+   * Fetch publication-ready Google SRE postmortem and Markdown for a scenario.
+   * @param {string} scenarioKey
+   * @param {string|null} provider
+   * @param {number} seed
+   */
+  async getScenarioPostmortem(scenarioKey, provider = null, seed = 42) {
+    const providerParam = provider ? `&provider=${encodeURIComponent(provider)}` : '';
+    const res = await fetch(
+      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/postmortem?seed=${seed}${providerParam}`
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * Generate postmortem from arbitrary incident and diagnostic report payload.
+   * @param {object} incident
+   * @param {object|null} diagnosticReport
+   * @param {string|null} provider
+   */
+  async generatePostmortem(incident, diagnosticReport = null, provider = 'mock') {
+    const res = await fetch(`${API_BASE}/api/postmortem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        incident,
+        diagnostic_report: diagnosticReport,
+        provider
+      })
+    });
+    return handleResponse(res);
   }
 };
 

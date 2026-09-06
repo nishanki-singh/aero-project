@@ -69,8 +69,10 @@ class PostmortemExporter:
         ])
 
         for fw in pm.five_whys:
+            grounding_note = f" *(Evidence: `{fw.evidence_ref}`)*" if fw.evidence_ref else (" *(Derived Inference)*" if fw.is_inferred else "")
             md.append(f"{fw.level}. **Why?** {fw.why}")
-            md.append(f"   * **Because:** {fw.because}")
+            md.append(f"   * **Because:** {fw.because}{grounding_note}")
+
 
         md.extend([
             "",
@@ -84,7 +86,8 @@ class PostmortemExporter:
 
         for m in pm.timeline_milestones:
             ts_str = m.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            md.append(f"| `{ts_str}` | **{m.milestone_type.value}** | {m.title}: {m.description} | `{m.source_signal}` |")
+            title_str = "Mitigation / Recovery Event" if m.title == "Remediation Mitigation Executed" else m.title
+            md.append(f"| `{ts_str}` | **{m.milestone_type.value}** | {title_str}: {m.description} | `{m.source_signal}` |")
 
         md.extend([
             "",
@@ -92,7 +95,7 @@ class PostmortemExporter:
             "",
             "## 6. Remediation & Recovery Verification",
             "",
-            "### Immediate Mitigation Steps Executed:",
+            "### Mitigation / Recovery Actions:",
         ])
 
         for i, step in enumerate(remed.immediate_steps):

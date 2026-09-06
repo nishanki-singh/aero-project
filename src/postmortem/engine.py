@@ -89,7 +89,7 @@ class MockPostmortemEngine(BasePostmortemEngine):
                         "Heap crossed 2Gi container limit -> JVM GC paused for 12s -> Linux kernel OOM Killer terminated container with ExitCode 137."
                     ),
                 ),
-                five_whys=[
+                five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
                     FiveWhysAnalysis(level=1, why="Why did worker-service stop processing batch jobs?", because="Container process was terminated by Linux kernel OOM killer (ExitCode 137)."),
                     FiveWhysAnalysis(level=2, why="Why was the container OOM-killed?", because="JVM heap utilization climbed continuously to 100% (2.0GiB limit) during payload ingestion."),
                     FiveWhysAnalysis(level=3, why="Why did memory utilization reach 100%?", because="An 850MB uncompressed batch payload was buffered entirely in-memory as a single contiguous object."),
@@ -176,7 +176,7 @@ class MockPostmortemEngine(BasePostmortemEngine):
                         "All checkout threads blocked resulting in cascading HTTP 504 timeouts."
                     ),
                 ),
-                five_whys=[
+                five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
                     FiveWhysAnalysis(level=1, why="Why did checkout requests fail with HTTP 504?", because="Order service threads timed out waiting for database connection pool access."),
                     FiveWhysAnalysis(level=2, why="Why were database connections unavailable?", because="All 20 connections in the HikariCP pool were continuously saturated by slow-running transactions."),
                     FiveWhysAnalysis(level=3, why="Why were transactions running slowly?", because="A new query in release v2.4.1 executed a full table scan taking 15+ seconds per checkout."),
@@ -230,6 +230,261 @@ class MockPostmortemEngine(BasePostmortemEngine):
                 ],
             )
 
+        # 3. Pattern: Config Drift / JWKS mismatch
+        elif any("unknownhostexception" in log.message.lower() or "jwtvalidation" in log.message.lower() for log in incident.telemetry.logs):
+            return AeroPostmortem(
+                postmortem_id=post_id,
+                incident_id=meta.incident_id,
+                title=f"Postmortem: Auth Service Global 401 Authentication Collapse via JWKS Config Drift ({meta.incident_id})",
+                service_name=svc,
+                severity=meta.severity.value,
+                status="PUBLISHED",
+                created_at=now,
+                executive_summary=(
+                    "On August 30, 2026, auth-service experienced a severe SEV1 outage where user API requests "
+                    "suffered 99% HTTP 401 Unauthorized errors due to an unresolvable JWKS public key endpoint hostname "
+                    "configured in ConfigMap rev-42 during routine configuration reload."
+                ),
+                impact=ImpactSummary(
+                    affected_service=svc,
+                    severity=meta.severity.value,
+                    total_downtime_minutes=timeline.total_duration_minutes,
+                    failed_requests_estimate="~34,000 authentication and token verification requests rejected (401)",
+                    impacted_customers_or_flows="All inbound customer API requests requiring JWT authentication across all domains",
+                ),
+                root_cause=RootCauseSummary(
+                    title="Configuration Drift & Unresolvable JWKS Host",
+                    category="CONFIGURATION_DRIFT",
+                    trigger_event="ConfigMap update (config-rev-42) at 14:02 UTC",
+                    causal_chain=(
+                        "ConfigMap update (config-rev-42) deployed -> Unresolvable staging hostname auth-internal.prod.local applied -> "
+                        "DNS resolution failed with UnknownHostException -> JWT public key retrieval failed -> "
+                        "All incoming JWT validation attempts failed resulting in 99% HTTP 401 errors."
+                    ),
+                ),
+                five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
+                    FiveWhysAnalysis(level=1, why="Why did API requests fail with HTTP 401?", because="Auth service rejected JWT tokens as unverified."),
+                    FiveWhysAnalysis(level=2, why="Why did JWT verification fail?", because="Public keys could not be retrieved from the JWKS URI."),
+                    FiveWhysAnalysis(level=3, why="Why was JWKS endpoint unreachable?", because="DNS failed to resolve auth-internal.prod.local."),
+                    FiveWhysAnalysis(level=4, why="Why was an invalid hostname configured?", because="Staging configuration was applied to production ConfigMap rev-42."),
+                ],
+                timeline_milestones=timeline.milestones,
+                remediation_performed=diagnostic_report.recommended_remediation,
+                action_items=[
+                    ActionItem(
+                        id="ACT-AUTH-001",
+                        title="Rollback ConfigMap to Revision rev-41 and Reload Pods",
+                        description="Apply previous validated ConfigMap revision rev-41 with valid production JWKS endpoint.",
+                        category=ActionItemCategory.MITIGATION,
+                        priority=ActionItemPriority.P0,
+                        owner="Identity Platform On-Call",
+                        estimated_effort="15 minutes",
+                        verification="auth/jwt_verification_failure_rate drops to 0% and 401 errors resolve.",
+                    ),
+                    ActionItem(
+                        id="ACT-AUTH-002",
+                        title="Implement In-Memory JWKS Public Key Cache Grace Period",
+                        description="Add resilient 1-hour stale key cache fallback when DNS resolution encounters transient failures.",
+                        category=ActionItemCategory.RESILIENCE,
+                        priority=ActionItemPriority.P1,
+                        owner="Authentication Engineering Team",
+                        estimated_effort="2 days",
+                        verification="Service continues verifying valid tokens during simulated 10-minute DNS blackout.",
+                    ),
+                    ActionItem(
+                        id="ACT-AUTH-003",
+                        title="Add Automated Hostname & Schema Validation to ConfigMap CI Pipeline",
+                        description="Enforce DNS resolution validation gates in CI before allowing ConfigMap promotions to production.",
+                        category=ActionItemCategory.TESTING,
+                        priority=ActionItemPriority.P1,
+                        owner="Platform CI/CD Team",
+                        estimated_effort="1 sprint",
+                        verification="CI pipeline blocks deployment of unreachable hostnames.",
+                    ),
+                ],
+                lessons_learned_what_went_well=[
+                    "AERO isolated DNS UnknownHostException and correlated ConfigMap rev-42 within seconds.",
+                    "Rollback to revision rev-41 immediately restored 100% token validation success.",
+                ],
+                lessons_learned_what_went_wrong=[
+                    "ConfigMap update lacked automated DNS resolution validation before production rollout.",
+                    "Auth service lacked in-memory public key cache fallback during temporary DNS resolution failure.",
+                ],
+                lessons_learned_where_we_got_lucky=[
+                    "No user credentials or security keys were leaked or compromised.",
+                ],
+            )
+
+        # 4. Pattern: Dependency Latency / Thread Starvation
+        elif any("worker pool starvation" in log.message.lower() or "partner-payments" in log.message.lower() for log in incident.telemetry.logs):
+            return AeroPostmortem(
+                postmortem_id=post_id,
+                incident_id=meta.incident_id,
+                title=f"Postmortem: Checkout Service Thread Pool Starvation via Downstream Partner Latency ({meta.incident_id})",
+                service_name=svc,
+                severity=meta.severity.value,
+                status="PUBLISHED",
+                created_at=now,
+                executive_summary=(
+                    "On August 30, 2026, checkout-service experienced a SEV1 outage where customer checkout workflows froze "
+                    "due to 100% ThreadPoolExecutor worker starvation caused by unconstrained downstream third-party payment "
+                    "partner latency (>28s) without client-side socket timeouts."
+                ),
+                impact=ImpactSummary(
+                    affected_service=svc,
+                    severity=meta.severity.value,
+                    total_downtime_minutes=timeline.total_duration_minutes,
+                    failed_requests_estimate="~8,900 checkout payment requests hung or timed out",
+                    impacted_customers_or_flows="Customer checkout payments and order confirmation processing",
+                ),
+                root_cause=RootCauseSummary(
+                    title="Downstream Dependency Latency & Thread Pool Starvation",
+                    category="DEPENDENCY_OUTAGE_TIMEOUT",
+                    trigger_event="Upstream partner API (api.partner-payments.io) latency degradation at 14:04 UTC",
+                    causal_chain=(
+                        "Third-party payment partner latency spiked to 28.5s -> Outbound HTTP client lacked socket read timeout -> "
+                        "All 100 worker threads blocked waiting for I/O -> ThreadPoolExecutor starved -> "
+                        "Incoming requests queued indefinitely and health check probes failed with timeouts."
+                    ),
+                ),
+                five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
+                    FiveWhysAnalysis(level=1, why="Why did checkout-service freeze?", because="All 100 worker threads were blocked in ThreadPoolExecutor."),
+                    FiveWhysAnalysis(level=2, why="Why were worker threads blocked?", because="Outbound synchronous payment calls to partner-payments.io took >28s."),
+                    FiveWhysAnalysis(level=3, why="Why did worker threads wait indefinitely?", because="Client HTTP configuration lacked socket read timeouts and circuit breaking."),
+                    FiveWhysAnalysis(level=4, why="Why did payment partner degrade?", because="Upstream partner experienced routing partition without degraded mode fallback in client."),
+                ],
+                timeline_milestones=timeline.milestones,
+                remediation_performed=diagnostic_report.recommended_remediation,
+                action_items=[
+                    ActionItem(
+                        id="ACT-CHK-001",
+                        title="Configure 2500ms Socket Timeout & Resilience4j Circuit Breaker",
+                        description="Enforce strict socket read timeouts and circuit breaking on partner-payments client.",
+                        category=ActionItemCategory.MITIGATION,
+                        priority=ActionItemPriority.P0,
+                        owner="Payment Integration Team",
+                        estimated_effort="1 day",
+                        verification="Partner calls taking >2500ms trip circuit breaker and return fast fallback.",
+                    ),
+                    ActionItem(
+                        id="ACT-CHK-002",
+                        title="Implement Asynchronous Payment Dispatch Queue",
+                        description="Decouple user checkout requests from synchronous third-party payment confirmation.",
+                        category=ActionItemCategory.RESILIENCE,
+                        priority=ActionItemPriority.P1,
+                        owner="Checkout Core Team",
+                        estimated_effort="1 sprint",
+                        verification="Checkout service accepts orders under upstream payment partner outages.",
+                    ),
+                    ActionItem(
+                        id="ACT-CHK-003",
+                        title="Add Outbound Third-Party Latency Alerting",
+                        description="Alert on partner latency P99 > 5s before internal worker thread pool saturation occurs.",
+                        category=ActionItemCategory.MONITORING,
+                        priority=ActionItemPriority.P1,
+                        owner="SRE Observability Team",
+                        estimated_effort="1 day",
+                        verification="Synthetic probe triggers alert on partner degradation within 60s.",
+                    ),
+                ],
+                lessons_learned_what_went_well=[
+                    "Thread starvation metric alert triggered within 2 minutes of worker saturation.",
+                    "AERO identified partner-payments.io latency bottleneck despite low (2%) CPU utilization.",
+                ],
+                lessons_learned_what_went_wrong=[
+                    "Outbound HTTP client lacked socket timeouts and circuit breaking.",
+                    "All worker threads were allocated to synchronous payment processing without pool isolation.",
+                ],
+                lessons_learned_where_we_got_lucky=[
+                    "Cart data remained persisted in Redis without loss during thread pool freeze.",
+                ],
+            )
+
+        # 5. Pattern: Cache Stampede / Deserialization
+        elif any("serializationerror" in log.message.lower() or "cache stampede" in log.message.lower() for log in incident.telemetry.logs):
+            return AeroPostmortem(
+                postmortem_id=post_id,
+                incident_id=meta.incident_id,
+                title=f"Postmortem: Catalog Service PostgreSQL CPU Saturation via Redis Deserialization Cache Stampede ({meta.incident_id})",
+                service_name=svc,
+                severity=meta.severity.value,
+                status="PUBLISHED",
+                created_at=now,
+                executive_summary=(
+                    "On August 30, 2026, catalog-service experienced a SEV1 outage where database CPU utilization "
+                    "reached 100% and P99 latency exceeded 12s following v3.1.0 release, which introduced an incompatible "
+                    "binary serializer causing 98% Redis cache misses and an unmitigated database cache stampede."
+                ),
+                impact=ImpactSummary(
+                    affected_service=svc,
+                    severity=meta.severity.value,
+                    total_downtime_minutes=timeline.total_duration_minutes,
+                    failed_requests_estimate="~18,500 catalog browsing and product search queries degraded (>12s latency)",
+                    impacted_customers_or_flows="Product catalog browsing, search indexing, and category navigation",
+                ),
+                root_cause=RootCauseSummary(
+                    title="Cache Key Deserialization Failure & Database Stampede",
+                    category="CACHE_STAMPEDE_SERIALIZATION",
+                    trigger_event="Deployment of catalog-service:v3.1.0 at 14:02 UTC",
+                    causal_chain=(
+                        "Release v3.1.0 deployed with SnappyBinaryCodec -> Binary deserializer failed on existing JSON cache entries -> "
+                        "Redis cache hit ratio collapsed from 98.5% to 1.8% -> 50x query volume flooded PostgreSQL -> "
+                        "Database CPU reached 100% causing cascading timeouts across catalog-service."
+                    ),
+                ),
+                five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
+                    FiveWhysAnalysis(level=1, why="Why did catalog service latency exceed 12s?", because="PostgreSQL database CPU reached 100% under severe query overload."),
+                    FiveWhysAnalysis(level=2, why="Why was database query volume 50x normal?", because="Redis cache hit ratio collapsed from 98.5% down to 1.8%."),
+                    FiveWhysAnalysis(level=3, why="Why did cache reads fail?", because="Cache entries failed to deserialize with SerializationError."),
+                    FiveWhysAnalysis(level=4, why="Why did deserialization fail?", because="Release v3.1.0 introduced incompatible binary serializer without versioned keys."),
+                ],
+                timeline_milestones=timeline.milestones,
+                remediation_performed=diagnostic_report.recommended_remediation,
+                action_items=[
+                    ActionItem(
+                        id="ACT-CAT-001",
+                        title="Rollback catalog-service to v3.0.9 and Flush Corrupted Cache Keys",
+                        description="Rollback container to v3.0.9 and purge invalid cache keys with prefix 'catalog:v2'.",
+                        category=ActionItemCategory.MITIGATION,
+                        priority=ActionItemPriority.P0,
+                        owner="Catalog Team On-Call",
+                        estimated_effort="20 minutes",
+                        verification="redis/cache_hit_ratio recovers >95% and database CPU drops below 30%.",
+                    ),
+                    ActionItem(
+                        id="ACT-CAT-002",
+                        title="Implement Mutex / Singleflight Locking on Cache Miss",
+                        description="Prevent stampedes by allowing only one in-flight database query per cache miss key.",
+                        category=ActionItemCategory.RESILIENCE,
+                        priority=ActionItemPriority.P1,
+                        owner="Catalog Core Team",
+                        estimated_effort="3 days",
+                        verification="Simulated cache flush under 5,000 RPS produces <5 database queries per key.",
+                    ),
+                    ActionItem(
+                        id="ACT-CAT-003",
+                        title="Add Backward-Compatible Binary Serializer Tests in CI",
+                        description="Enforce regression tests verifying serializer compatibility across version boundaries.",
+                        category=ActionItemCategory.TESTING,
+                        priority=ActionItemPriority.P1,
+                        owner="Platform Quality Team",
+                        estimated_effort="1 sprint",
+                        verification="CI fails on serializer breaking changes without version bump.",
+                    ),
+                ],
+                lessons_learned_what_went_well=[
+                    "Redis cache hit ratio drop from 98.5% to 1.8% was caught immediately by golden signal monitors.",
+                    "AERO correlated the v3.1.0 deployment event with Redis SerializationError logs.",
+                ],
+                lessons_learned_what_went_wrong=[
+                    "Incompatible binary serializer was deployed without cache key prefix versioning (e.g. catalog:v2).",
+                    "Cache miss logic lacked mutex/singleflight locking, subjecting PostgreSQL to 50x query load.",
+                ],
+                lessons_learned_where_we_got_lucky=[
+                    "PostgreSQL primary node did not run out of disk or crash, avoiding WAL recovery overhead.",
+                ],
+            )
+
         # Generic Fallback
         return AeroPostmortem(
             postmortem_id=post_id,
@@ -252,7 +507,7 @@ class MockPostmortemEngine(BasePostmortemEngine):
                 trigger_event=diagnostic_report.probable_root_cause.trigger_event or "Service Anomaly",
                 causal_chain=diagnostic_report.probable_root_cause.description,
             ),
-            five_whys=[
+            five_whys=diagnostic_report.five_whys if diagnostic_report.five_whys else [
                 FiveWhysAnalysis(level=1, why=f"Why was {svc} degraded?", because="Service telemetry indicated abnormal error rates."),
                 FiveWhysAnalysis(level=2, why="Why were error rates elevated?", because="Underlying component experienced operational anomaly."),
                 FiveWhysAnalysis(level=3, why="Why did the anomaly manifest?", because="Trigger event exceeded steady-state tolerance."),
@@ -348,7 +603,7 @@ def get_postmortem_engine(provider: str | None = None) -> BasePostmortemEngine:
         if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"):
             try:
                 return VertexAiPostmortemEngine()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return MockPostmortemEngine()
         return MockPostmortemEngine()
     else:
