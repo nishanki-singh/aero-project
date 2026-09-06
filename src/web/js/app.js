@@ -7,6 +7,7 @@ import { store } from './state.js';
 import { api } from './api.js';
 import { initHeader } from './components/header.js';
 import { renderTelemetryWorkspace } from './components/telemetry.js';
+import { renderTimelineWorkspace } from './components/timeline.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -124,7 +125,13 @@ function renderActiveView(tabKey) {
     return;
   }
 
-  // Future Stages (4C-4H): Sleek placeholder containers
+  // Stage 4C: Fully rendered Incident Timeline & State Machine Replay for 'timeline' tab
+  if (tabKey === 'timeline') {
+    renderTimelineWorkspace(container);
+    return;
+  }
+
+  // Future Stages (4D-4H): Sleek placeholder containers
   const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const info = extractScenarioInfo(state.activeScenarioData, state.activeScenarioKey);
 
@@ -241,11 +248,30 @@ function updateIncidentSummary(scenarioData) {
 export async function loadScenarioDetails(scenarioKey) {
   if (!scenarioKey) return;
   try {
-    store.setState({ isLoading: true, error: null, activeScenarioKey: scenarioKey });
-    const scenarioData = await api.getScenarioByKey(scenarioKey);
+    store.setState({
+      isLoading: true,
+      error: null,
+      activeScenarioKey: scenarioKey,
+      currentReplayStep: 0,
+      isPlayingReplay: false,
+      selectedMilestoneIndex: null
+    });
+
+    // Fetch scenario telemetry pack, synthesized timeline, and replay series in parallel
+    const [scenarioData, timelineData, replayData] = await Promise.all([
+      api.getScenarioByKey(scenarioKey),
+      api.getScenarioTimeline(scenarioKey),
+      api.getScenarioReplay(scenarioKey, 60)
+    ]);
+
     store.setState({
       activeScenarioKey: scenarioKey,
       activeScenarioData: scenarioData,
+      activeTimelineData: timelineData,
+      activeReplayData: replayData,
+      currentReplayStep: 0,
+      isPlayingReplay: false,
+      selectedMilestoneIndex: null,
       isLoading: false
     });
     updateIncidentSummary(scenarioData);

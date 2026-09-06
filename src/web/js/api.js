@@ -58,5 +58,56 @@ export const api = {
   async getScenarioByKey(scenarioKey) {
     const res = await fetch(`${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}`);
     return handleResponse(res);
+  },
+
+  /**
+   * Fetch synthesized chronological timeline for a specific scenario.
+   * @param {string} scenarioKey 
+   * @param {number} seed 
+   */
+  async getScenarioTimeline(scenarioKey, seed = 42) {
+    const res = await fetch(`${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/timeline?seed=${seed}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * Fetch ordered step-by-step state replay series for a specific scenario.
+   * @param {string} scenarioKey 
+   * @param {number} intervalSeconds 
+   * @param {number} seed 
+   */
+  async getScenarioReplay(scenarioKey, intervalSeconds = 60, seed = 42) {
+    const res = await fetch(
+      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/replay?interval_seconds=${intervalSeconds}&seed=${seed}`
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * Synthesize timeline from arbitrary incident telemetry payload.
+   * @param {object} incident 
+   * @param {object|null} diagnosticReport 
+   */
+  async synthesizeTimeline(incident, diagnosticReport = null) {
+    const res = await fetch(`${API_BASE}/api/timeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incident, diagnostic_report: diagnosticReport })
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * Generate step-by-step state replay snapshots for arbitrary incident telemetry.
+   * @param {object} incident 
+   * @param {number} intervalSeconds 
+   */
+  async generateReplay(incident, intervalSeconds = 60) {
+    const res = await fetch(`${API_BASE}/api/timeline/replay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incident, interval_seconds: intervalSeconds })
+    });
+    return handleResponse(res);
   }
 };

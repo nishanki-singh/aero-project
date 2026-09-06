@@ -11,6 +11,12 @@ class AppState {
       activeScenarioData: null,
       activeTab: 'telemetry',
       providerMode: 'mock', // 'mock' is the strict default; 'live' requires explicit user action
+      activeTimelineData: null,
+      activeReplayData: null,
+      currentReplayStep: 0,
+      isPlayingReplay: false,
+      selectedMilestoneIndex: null,
+      replayPlaybackSpeed: 1000,
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from src.schemas.incident import Incident
-from src.schemas.telemetry import LogLevel
+from src.schemas.telemetry import HealthStatus, LogLevel
 from src.schemas.timeline import IncidentReplaySeries, SystemReplaySnapshot
 
 
@@ -45,6 +45,19 @@ class IncidentReplayProvider:
                 max_deviation = dev
                 primary_series = s
 
+        # Canonical lifecycle timing
+        svc_health = [h for h in telemetry.health_signals if h.service_name == svc]
+        mitigation_time = meta.detected_at + timedelta(minutes=5)
+        healthy_signal = next(
+            (h for h in reversed(svc_health) if h.status == HealthStatus.HEALTHY and h.timestamp > meta.detected_at),
+            None,
+        )
+        if healthy_signal:
+            recovery_time = healthy_signal.timestamp
+        else:
+            recovery_time = max(mitigation_time + timedelta(minutes=1), end_time - timedelta(minutes=1))
+        resolved_time = min(end_time, recovery_time + timedelta(minutes=1))
+
         current_time = start_time
         for step_idx in range(total_steps):
             window_step_end = current_time + timedelta(seconds=interval_seconds)
@@ -73,14 +86,18 @@ class IncidentReplayProvider:
                 metric_unit = primary_series.unit
 
             # 3. Capture health status at this time
-            health_pt = next(
-                (h for h in reversed(telemetry.health_signals) if h.timestamp <= current_time),
-                telemetry.health_signals[0] if telemetry.health_signals else None,
-            )
-
-            status_str = health_pt.status.value if health_pt else "HEALTHY"
-            lat_p99 = health_pt.latency_p99_ms if health_pt else 25.0
-            err_rate = health_pt.error_rate_pct if health_pt else 0.0
+            if current_time >= recovery_time:
+                status_str = "HEALTHY"
+                lat_p99 = 25.0
+                err_rate = 0.0
+            else:
+                health_pt = next(
+                    (h for h in reversed(svc_health) if h.timestamp <= current_time),
+                    svc_health[0] if svc_health else None,
+                )
+                status_str = health_pt.status.value if health_pt else "HEALTHY"
+                lat_p99 = health_pt.latency_p99_ms if health_pt else 25.0
+                err_rate = health_pt.error_rate_pct if health_pt else 0.0
 
             # 4. Generate contextual annotation
             annotation = None
@@ -90,10 +107,18 @@ class IncidentReplayProvider:
                 annotation = f"Deployment: {dep.service_name} {dep.version} deployed ({dep.change_summary})"
             elif current_time <= meta.detected_at < window_step_end:
                 annotation = f"Alert Triggered: {meta.title} (Severity: {meta.severity.value})"
+            elif current_time <= mitigation_time < window_step_end:
+                annotation = "Remediation Mitigation Executed: Operational fix applied"
+            elif current_time <= recovery_time < window_step_end:
+                annotation = "Service Health Recovery Verified: Error rate collapsed to 0%"
+            elif current_time >= resolved_time:
+                annotation = f"Incident Formally Resolved ({meta.incident_id})"
             elif error_logs:
                 annotation = f"Error Burst: {len(error_logs)} error logs captured in interval"
             elif status_str == "DEGRADED":
                 annotation = "Service degraded: health checks failing"
+            elif status_str == "UNHEALTHY":
+                annotation = "Service unhealthy: high error rate and latency"
 
             snapshots.append(
                 SystemReplaySnapshot(

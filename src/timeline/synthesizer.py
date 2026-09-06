@@ -169,17 +169,21 @@ class TimelineSynthesizer:
         )
 
         # 8. Recovery Verified & Resolution
-        resolution_time = telemetry.time_window_end
+        svc_health = [h for h in telemetry.health_signals if h.service_name == svc]
         healthy_signal = next(
-            (h for h in reversed(telemetry.health_signals) if h.status == HealthStatus.HEALTHY and h.timestamp > meta.detected_at),
+            (h for h in reversed(svc_health) if h.status == HealthStatus.HEALTHY and h.timestamp > meta.detected_at),
             None,
         )
         if healthy_signal:
-            resolution_time = healthy_signal.timestamp
+            recovery_time = healthy_signal.timestamp
+        else:
+            recovery_time = max(mitigation_time + timedelta(minutes=1), telemetry.time_window_end - timedelta(minutes=1))
+
+        resolved_time = min(telemetry.time_window_end, recovery_time + timedelta(minutes=1))
 
         milestones.append(
             TimelineMilestone(
-                timestamp=resolution_time,
+                timestamp=recovery_time,
                 milestone_type=MilestoneType.RECOVERY_VERIFIED,
                 title="Service Health Recovery Verified",
                 description="Golden signal metrics returned to normal baseline and error rate collapsed to 0%.",
@@ -191,7 +195,7 @@ class TimelineSynthesizer:
 
         milestones.append(
             TimelineMilestone(
-                timestamp=resolution_time + timedelta(minutes=1),
+                timestamp=resolved_time,
                 milestone_type=MilestoneType.RESOLVED,
                 title="Incident Formally Resolved",
                 description=f"Incident {meta.incident_id} marked as RESOLVED. Postmortem authoring initiated.",
