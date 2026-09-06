@@ -167,19 +167,21 @@ export const api = {
   },
 
   /**
-   * Generate postmortem from arbitrary incident and diagnostic report payload.
-   * @param {object} incident
-   * @param {object|null} diagnosticReport
+   * Send question to Grounded SRE Copilot.
+   * @param {string} scenarioKey
+   * @param {string} message
    * @param {string|null} provider
+   * @param {number} seed
    */
-  async generatePostmortem(incident, diagnosticReport = null, provider = 'mock') {
-    const res = await fetch(`${API_BASE}/api/postmortem`, {
+  async sendChatMessage(scenarioKey, message, provider = null, seed = 42) {
+    const res = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        incident,
-        diagnostic_report: diagnosticReport,
-        provider
+        scenario_key: scenarioKey,
+        message,
+        provider,
+        seed
       })
     });
     return handleResponse(res);

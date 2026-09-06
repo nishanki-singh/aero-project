@@ -1,5 +1,8 @@
-"""Pydantic schemas package for AERO."""
-
+from src.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    EvidenceItem,
+)
 from src.schemas.diagnostic import (
     AeroDiagnosticReport,
     ConfidenceLevel,
@@ -57,9 +60,12 @@ __all__ = [
     "AeroDiagnosticReport",
     "AeroPostmortem",
     "BenchmarkScenarioBundle",
+    "ChatRequest",
+    "ChatResponse",
     "ConfidenceLevel",
     "ConfidenceRating",
     "DeploymentEvent",
+    "EvidenceItem",
     "ExpectedEvidence",
     "ExpectedRemediation",
     "FiveWhysAnalysis",

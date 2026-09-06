@@ -30,6 +30,10 @@ class AppState {
       activePostmortemData: null,
       postmortemLoading: false,
       postmortemError: null,
+      copilotOpen: false,
+      copilotMessages: [],
+      copilotLoading: false,
+      copilotError: null,
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',
@@ -37,8 +41,6 @@ class AppState {
       },
       isLoading: false,
       error: null
-
-
     };
 
     this.listeners = new Set();

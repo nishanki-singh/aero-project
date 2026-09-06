@@ -12,12 +12,15 @@ from src.api.schemas import (
     ScenarioSummaryResponse,
 )
 from src.benchmark.scenarios import BENCHMARK_SCENARIOS
+from src.chat.engine import get_copilot_engine
+from src.chat.grounding import CopilotGroundingVerifier
 from src.config import config
 from src.engine.diagnostic_engine import get_diagnostic_engine
 from src.engine.grounding_verifier import GroundingVerifier
 from src.evaluation.evaluator import BenchmarkEvaluationReport, IncidentEvaluator
 from src.postmortem.engine import get_postmortem_engine
 from src.postmortem.exporter import PostmortemExporter
+from src.schemas.chat import ChatResponse
 from src.schemas.diagnostic import AeroDiagnosticReport
 from src.schemas.ground_truth import BenchmarkScenarioBundle
 from src.schemas.incident import Incident
@@ -151,3 +154,30 @@ class AeroService:
         bundles = [cls.get_scenario_bundle(k, seed=seed) for k in keys if k in BENCHMARK_SCENARIOS]
         engine = get_diagnostic_engine(provider=provider)
         return IncidentEvaluator.evaluate_benchmark_suite(bundles, engine)
+
+    @classmethod
+    def chat(
+        cls,
+        scenario_key: str,
+        message: str,
+        provider: str | None = None,
+        seed: int = 42,
+    ) -> ChatResponse:
+        """Processes an interactive chat question grounded in active scenario telemetry."""
+        bundle = cls.get_scenario_bundle(scenario_key, seed=seed)
+        incident = bundle.incident
+
+        # Get diagnostic report and timeline for full context
+        diag_resp = cls.diagnose(incident, provider=provider)
+        diagnostic_report = diag_resp.report
+        timeline = cls.synthesize_timeline(incident, diagnostic_report)
+
+        engine = get_copilot_engine(provider=provider)
+        response = engine.ask(incident, diagnostic_report, timeline, message, scenario_key)
+
+        # Grounding validation
+        is_grounded, failed_claims = CopilotGroundingVerifier.verify(response, incident)
+        response.grounded = is_grounded
+        response.failed_claims = failed_claims
+
+        return response

@@ -12,6 +12,7 @@ import { renderRcaWorkspace } from './components/diagnostic.js';
 import { renderGroundingWorkspace } from './components/grounding_scorecard.js';
 import { renderRemediationWorkspace } from './components/remediation.js';
 import { renderPostmortemStudio } from './components/postmortem.js';
+import { initCopilotDrawer, toggleCopilotDrawer, resetCopilotChat } from './components/copilot_chat.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -316,6 +317,7 @@ export async function loadScenarioDetails(scenarioKey) {
       selectedMilestoneIndex: null,
       isLoading: false
     });
+    resetCopilotChat();
     updateIncidentSummary(scenarioData);
     renderActiveView(store.getState().activeTab);
   } catch (err) {
@@ -385,7 +387,7 @@ function initDockActions() {
 
   if (btnChat) {
     btnChat.addEventListener('click', () => {
-      alert('Interactive SRE Copilot Chat drawer will be integrated in Stage 4G.');
+      toggleCopilotDrawer();
     });
   }
 }
@@ -397,10 +399,11 @@ async function bootstrapApp() {
   try {
     clearError();
 
-    // 1. Initialize Header
+    // 1. Initialize Header & Drawer
     initHeader((newScenarioKey) => {
       loadScenarioDetails(newScenarioKey);
     });
+    initCopilotDrawer();
 
     // 2. Initialize Navigation & Actions
     initLifecycleNav();

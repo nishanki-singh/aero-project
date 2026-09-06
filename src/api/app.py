@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.routes import (
+    chat_router,
     diagnostic_router,
     evaluation_router,
     health_router,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(timeline_router)
     app.include_router(postmortem_router)
     app.include_router(evaluation_router)
+    app.include_router(chat_router)
 
     # Mount static assets for SRE Command Center UI (Stage 4A)
     web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
