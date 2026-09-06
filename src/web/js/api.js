@@ -109,5 +109,47 @@ export const api = {
       body: JSON.stringify({ incident, interval_seconds: intervalSeconds })
     });
     return handleResponse(res);
+  },
+
+  /**
+   * Fetch structured diagnostic report and evidence grounding for a scenario.
+   * @param {string} scenarioKey 
+   * @param {string|null} provider 
+   * @param {number} seed 
+   */
+  async getScenarioDiagnosis(scenarioKey, provider = null, seed = 42) {
+    const providerParam = provider ? `&provider=${encodeURIComponent(provider)}` : '';
+    const res = await fetch(
+      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/diagnose?seed=${seed}${providerParam}`
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * Fetch quantitative benchmark evaluation metrics for a scenario.
+   * @param {string} scenarioKey 
+   * @param {string} provider 
+   * @param {number} seed 
+   */
+  async getScenarioEvaluation(scenarioKey, provider = 'mock', seed = 42) {
+    const res = await fetch(
+      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/evaluation?provider=${encodeURIComponent(provider)}&seed=${seed}`
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * Run AI diagnosis on an arbitrary incident telemetry payload.
+   * @param {object} incident 
+   * @param {string|null} provider 
+   */
+  async runDiagnosis(incident, provider = 'mock') {
+    const res = await fetch(`${API_BASE}/api/diagnose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incident, provider })
+    });
+    return handleResponse(res);
   }
 };
+

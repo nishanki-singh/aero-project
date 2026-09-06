@@ -105,7 +105,9 @@ def build_diagnostic_prompt(incident: Incident, summary: CorrelatedTelemetrySumm
 1. Analyze the correlated evidence to identify the primary root cause and trigger event.
 2. Formulate a structured diagnostic report conforming strictly to the requested JSON schema.
 3. In `supporting_evidence`, cite ONLY timestamps, messages, and metrics that appear verbatim in the telemetry above.
-4. Calculate a confidence score (0.0 to 1.0) and confidence rating (HIGH, MEDIUM, LOW) with clear justification.
-5. In `recommended_remediation`, formulate a clear, actionable mitigation checklist covering immediate stabilization actions (such as rollback, restart, resource scaling, or configuration fix), concrete `dry_run_command`, observable `verification_metric`, and `rollback_plan`.
+4. In `five_whys`, provide an evidence-grounded causal progression from symptom to root cause. Trace each why/because step to concrete evidence or mark as derived inference.
+5. Calculate a confidence score (0.0 to 1.0) and confidence rating (HIGH, MEDIUM, LOW) with clear justification.
+6. In `recommended_remediation`, formulate a clear, actionable mitigation checklist covering immediate stabilization actions (such as rollback, restart, resource scaling, or configuration fix), concrete `dry_run_command`, observable `verification_metric`, and `rollback_plan`.
 """
     return prompt
+

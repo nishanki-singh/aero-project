@@ -70,6 +70,15 @@ class RunbookReference(BaseModel):
     pertinent_section: str = Field(..., description="Specific section or procedure name.")
 
 
+class FiveWhysAnalysis(BaseModel):
+    """Structured causal step in the Five-Whys root cause analysis chain."""
+    level: int = Field(..., ge=1, le=5, description="1 to 5 depth level.")
+    why: str = Field(..., description="Observed symptom or intermediary state.")
+    because: str = Field(..., description="Underlying cause or enabling condition.")
+    evidence_ref: str | None = Field(default=None, description="Direct telemetry/log evidence reference, if grounded.")
+    is_inferred: bool = Field(default=False, description="True if step is a derived causal inference rather than directly observed telemetry.")
+
+
 class AeroDiagnosticReport(BaseModel):
     """Complete structured diagnostic output produced by AERO's AI Reasoning Engine."""
     incident_id: str = Field(..., description="Associated incident identifier.")
@@ -79,8 +88,12 @@ class AeroDiagnosticReport(BaseModel):
     probable_root_cause: ProbableRootCause = Field(..., description="Identified root cause.")
     confidence_level: ConfidenceLevel = Field(..., description="Confidence assessment.")
     supporting_evidence: list[SupportingEvidence] = Field(default_factory=list, description="Citations to evidence.")
+    five_whys: list[FiveWhysAnalysis] = Field(
+        default_factory=list, description="Structured 5-Whys causal progression from symptom to root cause."
+    )
     similar_historical_incidents: list[HistoricalIncidentMatch] = Field(
         default_factory=list, description="Retrieved similar historical incidents from Engineering Memory."
     )
     recommended_remediation: RecommendedRemediation = Field(..., description="Actionable mitigation checklist.")
     relevant_runbook: RunbookReference | None = Field(default=None, description="Relevant runbook section.")
+

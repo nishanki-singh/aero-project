@@ -8,6 +8,9 @@ import { api } from './api.js';
 import { initHeader } from './components/header.js';
 import { renderTelemetryWorkspace } from './components/telemetry.js';
 import { renderTimelineWorkspace } from './components/timeline.js';
+import { renderRcaWorkspace } from './components/diagnostic.js';
+import { renderGroundingWorkspace } from './components/grounding_scorecard.js';
+import { renderRemediationWorkspace } from './components/remediation.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -36,8 +39,8 @@ const STAGE_META = {
     desc: 'Rigorous empirical verification of AI claims against incident telemetry. Displays Grounding Recall, Precision, and Hallucination Rate.'
   },
   remediation: {
-    stage: 'Stage 4E',
-    title: 'Safe Remediation Simulator (Dry-Run Only)',
+    stage: 'Stage 4D',
+    title: 'Safe Remediation & Simulation (Dry-Run Only)',
     icon: '⚙️',
     desc: 'Simulated execution environment for mitigation runbooks and scripts. Strictly isolated simulation with zero infrastructure mutation.'
   },
@@ -131,7 +134,25 @@ function renderActiveView(tabKey) {
     return;
   }
 
-  // Future Stages (4D-4H): Sleek placeholder containers
+  // Stage 4D: Fully rendered RCA & Diagnostic Workspace for 'rca' tab
+  if (tabKey === 'rca') {
+    renderRcaWorkspace(container);
+    return;
+  }
+
+  // Stage 4D: Fully rendered Evidence Grounding & Verification Matrix for 'grounding' tab
+  if (tabKey === 'grounding') {
+    renderGroundingWorkspace(container);
+    return;
+  }
+
+  // Stage 4D: Fully rendered Safe Remediation & Dry-Run Console for 'remediation' tab
+  if (tabKey === 'remediation') {
+    renderRemediationWorkspace(container);
+    return;
+  }
+
+  // Future Stages (4E-4H): Sleek placeholder containers
   const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const info = extractScenarioInfo(state.activeScenarioData, state.activeScenarioKey);
 
@@ -257,11 +278,13 @@ export async function loadScenarioDetails(scenarioKey) {
       selectedMilestoneIndex: null
     });
 
-    // Fetch scenario telemetry pack, synthesized timeline, and replay series in parallel
-    const [scenarioData, timelineData, replayData] = await Promise.all([
+    // Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, and evaluation in parallel
+    const [scenarioData, timelineData, replayData, diagData, evalData] = await Promise.all([
       api.getScenarioByKey(scenarioKey),
       api.getScenarioTimeline(scenarioKey),
-      api.getScenarioReplay(scenarioKey, 60)
+      api.getScenarioReplay(scenarioKey, 60),
+      api.getScenarioDiagnosis(scenarioKey),
+      api.getScenarioEvaluation(scenarioKey)
     ]);
 
     store.setState({
@@ -269,6 +292,16 @@ export async function loadScenarioDetails(scenarioKey) {
       activeScenarioData: scenarioData,
       activeTimelineData: timelineData,
       activeReplayData: replayData,
+      activeDiagnosisData: diagData,
+      activeEvaluationData: evalData,
+      selectedWhyLevel: 1,
+      remediationSimState: {
+        status: 'idle',
+        currentStep: 0,
+        logs: [],
+        isRunning: false,
+        completed: false
+      },
       currentReplayStep: 0,
       isPlayingReplay: false,
       selectedMilestoneIndex: null,

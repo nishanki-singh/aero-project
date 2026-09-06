@@ -14,6 +14,7 @@ from src.schemas.diagnostic import (
     AeroDiagnosticReport,
     ConfidenceLevel,
     ConfidenceRating,
+    FiveWhysAnalysis,
     ProbableRootCause,
     RecommendedRemediation,
     SignalType,
@@ -89,6 +90,36 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                         relevance="Explicit kernel container kill citing ExitCode 137 (OOMKilled).",
                     ),
                 ],
+                five_whys=[
+                    FiveWhysAnalysis(
+                        level=1,
+                        why="Worker service pods terminated with ExitCode 137 and HTTP 502 error rate spiked to 95%",
+                        because="Linux kernel killed the worker-service container process due to memory limit breach",
+                        evidence_ref="ExitCode 137 (OOMKilled) log entry",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=2,
+                        why="Container exceeded its 2Gi memory cgroup limit",
+                        because="JVM heap space was exhausted by unbounded object allocations during batch ingestion",
+                        evidence_ref="OutOfMemoryError: Java heap space log at 14:05:32",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=3,
+                        why="JVM heap accumulated 850MB of in-memory batch payload data",
+                        because="Batch ingestion job received an uncompressed single-file payload at 14:05 UTC",
+                        evidence_ref="container/memory_utilization reached 100% capacity metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=4,
+                        why="The ingestion pipeline buffered the entire 850MB batch into memory simultaneously",
+                        because="The parser was configured for synchronous in-memory buffering without streaming chunking",
+                        evidence_ref=None,
+                        is_inferred=True,
+                    ),
+                ],
                 recommended_remediation=RecommendedRemediation(
                     immediate_steps=[
                         "Restart worker-service deployment pods to clear hung tasks",
@@ -152,6 +183,36 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                     rationale="Direct causal link between v2.4.1 deploy timestamp, active connection metric saturation (20/20), and HikariCP acquisition timeouts.",
                 ),
                 supporting_evidence=evidence,
+                five_whys=[
+                    FiveWhysAnalysis(
+                        level=1,
+                        why="Order service checkout requests failed with 96% HTTP 504 Gateway Timeouts",
+                        because="Threads were blocked waiting to acquire database connections from the pool",
+                        evidence_ref="HikariPool-1 - Connection is not available timeout log",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=2,
+                        why="Database connection pool was saturated at max capacity (20/20 active connections)",
+                        because="All active connections were executing long-running sequential table scans on orders table",
+                        evidence_ref="database/pool/active_connections saturated at max capacity (20/20) metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=3,
+                        why="Order queries were performing sequential table scans taking >15 seconds each",
+                        because="Release v2.4.1 introduced a slow query filtering on unindexed status and customer_id columns",
+                        evidence_ref=f"Deployment version {deploy.version if deploy else 'v2.4.1'} change event",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=4,
+                        why="The required database composite index was missing in production",
+                        because="Database migration scripts and index verification were omitted from the v2.4.1 release pipeline",
+                        evidence_ref=None,
+                        is_inferred=True,
+                    ),
+                ],
                 recommended_remediation=RecommendedRemediation(
                     immediate_steps=[
                         "Rollback order-service to previous stable release v2.4.0",
@@ -226,6 +287,36 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                     rationale="Direct correlation between ConfigMap reload log, UnknownHostException DNS error, and 99% JWT failure spike.",
                 ),
                 supporting_evidence=evidence,
+                five_whys=[
+                    FiveWhysAnalysis(
+                        level=1,
+                        why="Auth service rejected user requests with global HTTP 401 Unauthorized errors",
+                        because="JWT token validation failed for 99% of incoming API requests",
+                        evidence_ref="auth/jwt_verification_failure_rate spiked to 99% metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=2,
+                        why="Auth service failed to validate JWT signatures",
+                        because="The service could not resolve or retrieve the JWKS public key endpoint",
+                        evidence_ref="JWTValidationException indicating public key retrieval failure log",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=3,
+                        why="DNS resolution failed for the internal JWKS URI (auth-internal.prod.local)",
+                        because="ConfigMap update (config-rev-42) configured an unresolvable staging hostname in production",
+                        evidence_ref="DNS UnknownHostException log entry",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=4,
+                        why="An invalid staging hostname was committed to the production ConfigMap",
+                        because="Environment configuration promotion was applied without automated hostname validation checks",
+                        evidence_ref="Config update config-rev-42 deployment event",
+                        is_inferred=False,
+                    ),
+                ],
                 recommended_remediation=RecommendedRemediation(
                     immediate_steps=[
                         "Rollback auth-service ConfigMap to previous revision rev-41",
@@ -292,6 +383,36 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                         source=svc,
                         content=outbound_log.message,
                         relevance="Outbound call to api.partner-payments.io exceeding threshold.",
+                    ),
+                ],
+                five_whys=[
+                    FiveWhysAnalysis(
+                        level=1,
+                        why="Checkout service froze and health check probes failed with probe timeouts",
+                        because="All 100 worker threads in ThreadPoolExecutor were blocked and unable to accept new tasks",
+                        evidence_ref="Worker pool starvation in ThreadPoolExecutor log",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=2,
+                        why="Worker threads were all consumed and blocked",
+                        because="Outbound synchronous payment calls to api.partner-payments.io hung for >28 seconds",
+                        evidence_ref="Partner payment latency spiked to 28500ms on api.partner-payments.io metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=3,
+                        why="Checkout worker threads waited indefinitely on external network I/O",
+                        because="The HTTP client lacked socket read timeouts and circuit breaking for the third-party payment partner",
+                        evidence_ref="Outbound call to api.partner-payments.io exceeding threshold log",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=4,
+                        why="Third-party payment partner experienced unannounced upstream latency degradation",
+                        because="Upstream partner API suffered network partitioning without degraded mode fallback in client",
+                        evidence_ref=None,
+                        is_inferred=True,
                     ),
                 ],
                 recommended_remediation=RecommendedRemediation(
@@ -364,6 +485,36 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                     rationale="Direct causal sequence from v3.1.0 deployment -> Redis SerializationError -> cache hit ratio collapse (1.8%) -> Database 100% CPU saturation.",
                 ),
                 supporting_evidence=evidence,
+                five_whys=[
+                    FiveWhysAnalysis(
+                        level=1,
+                        why="Catalog service response latency spiked to >12s and database CPU reached 100%",
+                        because="PostgreSQL was overwhelmed by 50x query volume due to total cache miss stampede",
+                        evidence_ref="Database CPU reached 100% under cache stampede metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=2,
+                        why="Redis cache hit ratio collapsed from 98.5% down to 1.8%",
+                        because="All cache read operations failed with deserialization errors when reading cached catalog keys",
+                        evidence_ref="redis/cache_hit_ratio collapsed from 98.5% to 1.8% metric",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=3,
+                        why="Cache reads encountered SerializationError on key prefixes",
+                        because="Release v3.1.0 introduced an incompatible binary serializer (SnappyBinaryCodec)",
+                        evidence_ref="SerializationError on Redis cache key prefix log",
+                        is_inferred=False,
+                    ),
+                    FiveWhysAnalysis(
+                        level=4,
+                        why="The new binary codec attempted to deserialize legacy JSON-encoded cache entries",
+                        because="Cache key version namespacing (catalog:v2) and cache invalidation was omitted during deployment",
+                        evidence_ref=f"Deployment version {deploy.version if deploy else 'v3.1.0'} change event",
+                        is_inferred=False,
+                    ),
+                ],
                 recommended_remediation=RecommendedRemediation(
                     immediate_steps=[
                         "Rollback catalog-service to previous release v3.0.9",
@@ -393,12 +544,29 @@ class MockDiagnosticEngine(BaseDiagnosticEngine):
                 rationale="Telemetry shows anomalous error logs and degraded health status.",
             ),
             supporting_evidence=[],
+            five_whys=[
+                FiveWhysAnalysis(
+                    level=1,
+                    why="Service error rate elevated above threshold",
+                    because="Anomalous behavior detected in service logs and metrics",
+                    evidence_ref="Telemetry error signals",
+                    is_inferred=False,
+                ),
+                FiveWhysAnalysis(
+                    level=2,
+                    why="Service health degraded",
+                    because="Internal processing failures causing request degradation",
+                    evidence_ref=None,
+                    is_inferred=True,
+                ),
+            ],
             recommended_remediation=RecommendedRemediation(
                 immediate_steps=["Inspect service logs and restart deployment"],
                 verification_metric="Health status returns to HEALTHY",
                 rollback_plan="Revert recent deployments",
             ),
         )
+
 
 
 class VertexAiDiagnosticEngine(BaseDiagnosticEngine):
@@ -467,8 +635,9 @@ def get_diagnostic_engine(provider: str | None = None) -> BaseDiagnosticEngine:
             try:
                 engine = VertexAiDiagnosticEngine()
                 return engine
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return MockDiagnosticEngine()
+
         return MockDiagnosticEngine()
     else:
         return MockDiagnosticEngine()

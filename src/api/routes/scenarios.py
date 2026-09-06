@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.schemas import ScenarioSummaryResponse
+from src.api.schemas import DiagnoseResponse, ScenarioSummaryResponse
 from src.api.service import AeroService
+from src.engine.diagnostic_engine import get_diagnostic_engine
+from src.evaluation.evaluator import IncidentEvaluator, ScenarioEvaluationResult
 from src.schemas.ground_truth import BenchmarkScenarioBundle
 from src.schemas.timeline import IncidentReplaySeries, IncidentTimeline
 
@@ -49,3 +51,33 @@ def get_scenario_replay(
         return AeroService.generate_replay(bundle.incident, interval_seconds=interval_seconds)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{scenario_key}/diagnose", response_model=DiagnoseResponse, summary="Get diagnosis and evidence grounding for scenario")
+def get_scenario_diagnosis(
+    scenario_key: str,
+    provider: str | None = Query(default=None, description="Diagnostic provider ('mock' or 'vertex')"),
+    seed: int = Query(default=42, description="Random seed"),
+) -> DiagnoseResponse:
+    """Performs deterministic or Vertex AI causal diagnosis and evidence grounding check for a benchmark scenario."""
+    try:
+        bundle = AeroService.get_scenario_bundle(scenario_key, seed=seed)
+        return AeroService.diagnose(bundle.incident, provider=provider)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{scenario_key}/evaluation", response_model=ScenarioEvaluationResult, summary="Get quantitative benchmark evaluation score")
+def get_scenario_evaluation(
+    scenario_key: str,
+    provider: str | None = Query(default="mock", description="Diagnostic provider"),
+    seed: int = Query(default=42, description="Random seed"),
+) -> ScenarioEvaluationResult:
+    """Evaluates the scenario diagnostic report against ground-truth benchmark metrics (Recall, Precision, Hallucination Rate)."""
+    try:
+        bundle = AeroService.get_scenario_bundle(scenario_key, seed=seed)
+        engine = get_diagnostic_engine(provider=provider)
+        return IncidentEvaluator.evaluate_scenario(bundle, engine)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+

@@ -17,6 +17,16 @@ class AppState {
       isPlayingReplay: false,
       selectedMilestoneIndex: null,
       replayPlaybackSpeed: 1000,
+      activeDiagnosisData: null,
+      activeEvaluationData: null,
+      selectedWhyLevel: 1,
+      remediationSimState: {
+        status: 'idle',
+        currentStep: 0,
+        logs: [],
+        isRunning: false,
+        completed: false
+      },
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',
@@ -24,6 +34,7 @@ class AppState {
       },
       isLoading: false,
       error: null
+
     };
 
     this.listeners = new Set();

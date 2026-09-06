@@ -7,7 +7,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from src.schemas.diagnostic import RecommendedRemediation
+from src.schemas.diagnostic import FiveWhysAnalysis, RecommendedRemediation
 from src.schemas.timeline import TimelineMilestone
 
 
@@ -38,13 +38,6 @@ class ActionItem(BaseModel):
     owner: str = Field(..., description="Assigned engineering team or role.")
     estimated_effort: str = Field(..., description="Estimated effort (e.g., '1 day', '1 sprint').")
     verification: str = Field(..., description="Criterion or test proving action was successful.")
-
-
-class FiveWhysAnalysis(BaseModel):
-    """Structured causal step in the Five-Whys root cause analysis chain."""
-    level: int = Field(..., ge=1, le=5, description="1 to 5 depth level.")
-    why: str = Field(..., description="Observed symptom or intermediary state.")
-    because: str = Field(..., description="Underlying cause or enabling condition.")
 
 
 class RootCauseSummary(BaseModel):
