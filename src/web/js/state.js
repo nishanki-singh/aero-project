@@ -34,6 +34,10 @@ class AppState {
       copilotMessages: [],
       copilotLoading: false,
       copilotError: null,
+      riskAdvisorOpen: false,
+      riskAnalysisResult: null,
+      riskAdvisorLoading: false,
+      riskAdvisorError: null,
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',

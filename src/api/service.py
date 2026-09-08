@@ -20,10 +20,12 @@ from src.engine.grounding_verifier import GroundingVerifier
 from src.evaluation.evaluator import BenchmarkEvaluationReport, IncidentEvaluator
 from src.postmortem.engine import get_postmortem_engine
 from src.postmortem.exporter import PostmortemExporter
+from src.risk.engine import DeterministicRiskEngine
 from src.schemas.chat import ChatResponse
 from src.schemas.diagnostic import AeroDiagnosticReport
 from src.schemas.ground_truth import BenchmarkScenarioBundle
 from src.schemas.incident import Incident
+from src.schemas.risk import RiskAnalysisRequest, RiskAnalysisResponse
 from src.schemas.timeline import IncidentReplaySeries, IncidentTimeline
 from src.timeline.replay import IncidentReplayProvider
 from src.timeline.synthesizer import TimelineSynthesizer
@@ -181,3 +183,18 @@ class AeroService:
         response.failed_claims = failed_claims
 
         return response
+
+    @classmethod
+    def analyze_risk(
+        cls,
+        request: RiskAnalysisRequest,
+        seed: int = 42,
+    ) -> RiskAnalysisResponse:
+        """Evaluates proposed deployment/configuration changes using deterministic safety rules."""
+        incident = None
+        if request.scenario_key:
+            bundle = cls.get_scenario_bundle(request.scenario_key, seed=seed)
+            incident = bundle.incident
+
+        engine = DeterministicRiskEngine()
+        return engine.analyze_request(request, incident=incident)

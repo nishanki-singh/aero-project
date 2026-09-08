@@ -36,6 +36,14 @@ from src.schemas.postmortem import (
     ImpactSummary,
     RootCauseSummary,
 )
+from src.schemas.risk import (
+    ProposedChange,
+    RiskAnalysisRequest,
+    RiskAnalysisResponse,
+    RiskCategory,
+    RiskFinding,
+    RiskSeverity,
+)
 from src.schemas.telemetry import (
     DeploymentEvent,
     HealthStatus,
@@ -85,7 +93,13 @@ __all__ = [
     "MetricSeries",
     "MilestoneType",
     "ProbableRootCause",
+    "ProposedChange",
     "RecommendedRemediation",
+    "RiskAnalysisRequest",
+    "RiskAnalysisResponse",
+    "RiskCategory",
+    "RiskFinding",
+    "RiskSeverity",
     "RootCauseSummary",
     "RunbookReference",
     "ServiceHealth",

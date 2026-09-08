@@ -185,6 +185,24 @@ export const api = {
       })
     });
     return handleResponse(res);
+  },
+
+  /**
+   * Evaluate proposed deployment/config change for SRE stability risks.
+   * @param {object} proposedChange
+   * @param {string|null} scenarioKey
+   * @param {string} provider
+   */
+  async analyzeRisk(proposedChange, scenarioKey = null, provider = 'deterministic') {
+    const res = await fetch(`${API_BASE}/api/risk/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        proposed_change: proposedChange,
+        scenario_key: scenarioKey,
+        provider
+      })
+    });
+    return handleResponse(res);
   }
 };
-

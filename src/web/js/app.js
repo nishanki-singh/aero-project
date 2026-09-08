@@ -13,6 +13,7 @@ import { renderGroundingWorkspace } from './components/grounding_scorecard.js';
 import { renderRemediationWorkspace } from './components/remediation.js';
 import { renderPostmortemStudio } from './components/postmortem.js';
 import { initCopilotDrawer, toggleCopilotDrawer, resetCopilotChat } from './components/copilot_chat.js';
+import { initRiskAdvisorDrawer, toggleRiskAdvisorDrawer, resetRiskAdvisor } from './components/risk_advisor.js';
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -318,6 +319,7 @@ export async function loadScenarioDetails(scenarioKey) {
       isLoading: false
     });
     resetCopilotChat();
+    resetRiskAdvisor();
     updateIncidentSummary(scenarioData);
     renderActiveView(store.getState().activeTab);
   } catch (err) {
@@ -381,7 +383,7 @@ function initDockActions() {
 
   if (btnRisk) {
     btnRisk.addEventListener('click', () => {
-      alert('Risk & Change Advisor drawer will be integrated in Stage 4G.');
+      toggleRiskAdvisorDrawer();
     });
   }
 
@@ -399,11 +401,12 @@ async function bootstrapApp() {
   try {
     clearError();
 
-    // 1. Initialize Header & Drawer
+    // 1. Initialize Header & Drawers
     initHeader((newScenarioKey) => {
       loadScenarioDetails(newScenarioKey);
     });
     initCopilotDrawer();
+    initRiskAdvisorDrawer();
 
     // 2. Initialize Navigation & Actions
     initLifecycleNav();
