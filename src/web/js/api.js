@@ -204,5 +204,59 @@ export const api = {
       })
     });
     return handleResponse(res);
+  },
+
+  /**
+   * Fetch canonical microservice topology graph with observed incident telemetry mapping.
+   * @param {string|null} scenarioKey
+   */
+  async getTopology(scenarioKey = null) {
+    const query = scenarioKey ? `?scenario_key=${encodeURIComponent(scenarioKey)}` : '';
+    const res = await fetch(`${API_BASE}/api/topology${query}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * Evaluate dynamic blast radius and upstream cascade paths for a service.
+   * @param {string} serviceId
+   * @param {string|null} scenarioKey
+   */
+  async getBlastRadius(serviceId, scenarioKey = null) {
+    const query = scenarioKey ? `?scenario_key=${encodeURIComponent(scenarioKey)}` : '';
+    const res = await fetch(`${API_BASE}/api/topology/blast-radius/${encodeURIComponent(serviceId)}${query}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * Execute a pure synthetic chaos simulation experiment.
+   * @param {string} targetService
+   * @param {string} chaosType
+   * @param {number|null} magnitude
+   * @param {string|null} scenarioKey
+   */
+  async simulateChaos(targetService, chaosType, magnitude = null, scenarioKey = null) {
+    const res = await fetch(`${API_BASE}/api/topology/chaos/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target_service: targetService,
+        chaos_type: chaosType,
+        magnitude,
+        scenario_key: scenarioKey
+      })
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * Reset the topology graph to baseline observed incident state.
+   * @param {string|null} scenarioKey
+   */
+  async resetChaos(scenarioKey = null) {
+    const query = scenarioKey ? `?scenario_key=${encodeURIComponent(scenarioKey)}` : '';
+    const res = await fetch(`${API_BASE}/api/topology/chaos/reset${query}`, {
+      method: 'POST'
+    });
+    return handleResponse(res);
   }
 };

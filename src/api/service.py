@@ -27,8 +27,17 @@ from src.schemas.ground_truth import BenchmarkScenarioBundle
 from src.schemas.incident import Incident
 from src.schemas.risk import RiskAnalysisRequest, RiskAnalysisResponse
 from src.schemas.timeline import IncidentReplaySeries, IncidentTimeline
+from src.schemas.topology import (
+    BlastRadiusReport,
+    ChaosExperimentRequest,
+    ChaosSimulationResult,
+    TopologyGraph,
+)
 from src.timeline.replay import IncidentReplayProvider
 from src.timeline.synthesizer import TimelineSynthesizer
+from src.topology.chaos import ChaosSandboxEngine
+from src.topology.engine import BlastRadiusEngine
+from src.topology.graph import build_canonical_topology_graph
 
 
 class AeroService:
@@ -198,3 +207,39 @@ class AeroService:
 
         engine = DeterministicRiskEngine()
         return engine.analyze_request(request, incident=incident)
+
+    @classmethod
+    def get_topology(
+        cls,
+        scenario_key: str | None = None,
+    ) -> TopologyGraph:
+        """Constructs canonical topology with observed incident telemetry mapping."""
+        return build_canonical_topology_graph(scenario_key=scenario_key)
+
+    @classmethod
+    def get_blast_radius(
+        cls,
+        service_id: str,
+        scenario_key: str | None = None,
+    ) -> BlastRadiusReport:
+        """Evaluates dynamic blast radius for a given service node."""
+        graph = build_canonical_topology_graph(scenario_key=scenario_key)
+        engine = BlastRadiusEngine(graph=graph)
+        return engine.compute_blast_radius(target_service=service_id)
+
+    @classmethod
+    def simulate_chaos(
+        cls,
+        request: ChaosExperimentRequest,
+    ) -> ChaosSimulationResult:
+        """Executes a pure, deterministic chaos simulation without mutating persistent state."""
+        engine = ChaosSandboxEngine()
+        return engine.simulate_chaos(request)
+
+    @classmethod
+    def reset_chaos(
+        cls,
+        scenario_key: str | None = None,
+    ) -> TopologyGraph:
+        """Resets the topology view back to baseline observed incident state."""
+        return build_canonical_topology_graph(scenario_key=scenario_key)

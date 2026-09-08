@@ -19,6 +19,7 @@ from src.api.routes import (
     risk_router,
     scenarios_router,
     timeline_router,
+    topology_router,
 )
 from src.config import config
 
@@ -63,6 +64,8 @@ def create_app() -> FastAPI:
     app.include_router(evaluation_router)
     app.include_router(chat_router)
     app.include_router(risk_router)
+    app.include_router(topology_router)
+
 
     # Mount static assets for SRE Command Center UI (Stage 4A)
     web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))

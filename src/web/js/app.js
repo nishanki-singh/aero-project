@@ -14,6 +14,9 @@ import { renderRemediationWorkspace } from './components/remediation.js';
 import { renderPostmortemStudio } from './components/postmortem.js';
 import { initCopilotDrawer, toggleCopilotDrawer, resetCopilotChat } from './components/copilot_chat.js';
 import { initRiskAdvisorDrawer, toggleRiskAdvisorDrawer, resetRiskAdvisor } from './components/risk_advisor.js';
+import { renderTopologyWorkspace, resetTopologyState } from './components/topology.js';
+
+
 
 // Configuration for lifecycle stages (4B-4H placeholders in Stage 4A)
 const STAGE_META = {
@@ -161,7 +164,14 @@ function renderActiveView(tabKey) {
     return;
   }
 
-  // Future Stages (4F-4H): Sleek placeholder containers
+  // Stage 4H: Fully rendered Blast-Radius Topology & Synthetic Chaos Sandbox for 'architecture' tab
+  if (tabKey === 'architecture') {
+    renderTopologyWorkspace(container);
+    return;
+  }
+
+  // Fallback placeholder containers
+
   const meta = STAGE_META[tabKey] || STAGE_META.telemetry;
   const info = extractScenarioInfo(state.activeScenarioData, state.activeScenarioKey);
 
@@ -278,26 +288,77 @@ function updateIncidentSummary(scenarioData) {
 export async function loadScenarioDetails(scenarioKey) {
   if (!scenarioKey) return;
   try {
+    // 1. Monotonically increment scenario generation token to discard in-flight async calls from previous scenarios
+    const currentToken = (store.getState().scenarioToken || 0) + 1;
+
+    // 2. Immediately reset all simulation & interactive drawer states across components
+    resetTopologyState();
+    resetCopilotChat();
+    resetRiskAdvisor();
+
     store.setState({
+      scenarioToken: currentToken,
       isLoading: true,
       error: null,
       activeScenarioKey: scenarioKey,
+      activeScenarioData: null,
+      activeTimelineData: null,
+      activeReplayData: null,
+      activeDiagnosisData: null,
+      activeEvaluationData: null,
+      activePostmortemData: null,
       currentReplayStep: 0,
       isPlayingReplay: false,
-      selectedMilestoneIndex: null
+      selectedMilestoneIndex: null,
+      activeTopologyData: null,
+      selectedTopologyNode: null,
+      activeBlastRadiusData: null,
+      activeChaosSimulation: null,
+      isChaosSimulated: false,
+      topologyLoading: true,
+      topologyError: null
     });
 
-    // Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, evaluation, and postmortem in parallel
-    const [scenarioData, timelineData, replayData, diagData, evalData, postmortemData] = await Promise.all([
+    // 3. Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, evaluation, postmortem, and topology in parallel
+    const [scenarioData, timelineData, replayData, diagData, evalData, postmortemData, topoData] = await Promise.all([
       api.getScenarioByKey(scenarioKey),
       api.getScenarioTimeline(scenarioKey),
       api.getScenarioReplay(scenarioKey, 60),
       api.getScenarioDiagnosis(scenarioKey),
       api.getScenarioEvaluation(scenarioKey),
-      api.getScenarioPostmortem(scenarioKey)
+      api.getScenarioPostmortem(scenarioKey),
+      api.getTopology(scenarioKey).catch(() => null)
     ]);
 
+    // Guard: Discard stale response if a newer scenario switch was initiated while fetching
+    if (store.getState().scenarioToken !== currentToken) {
+      return;
+    }
+
+    // 4. Resolve the active incident service for the NEW scenario's observed baseline
+    const defaultNode = (topoData && topoData.active_incident_service) ||
+                        (scenarioData && scenarioData.incident && scenarioData.incident.metadata && scenarioData.incident.metadata.affected_service) ||
+                        (scenarioData && scenarioData.ground_truth && scenarioData.ground_truth.affected_service) ||
+                        (topoData && topoData.nodes && topoData.nodes[0] && topoData.nodes[0].id) ||
+                        'worker-service';
+
+    let blastData = null;
+    if (topoData && defaultNode) {
+      try {
+        blastData = await api.getBlastRadius(defaultNode, scenarioKey);
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    // Guard: Discard if token changed during blast-radius calculation
+    if (store.getState().scenarioToken !== currentToken) {
+      return;
+    }
+
+    // 5. Update store with fresh observed baseline ONLY (zero simulated state)
     store.setState({
+      scenarioToken: currentToken,
       activeScenarioKey: scenarioKey,
       activeScenarioData: scenarioData,
       activeTimelineData: timelineData,
@@ -305,6 +366,13 @@ export async function loadScenarioDetails(scenarioKey) {
       activeDiagnosisData: diagData,
       activeEvaluationData: evalData,
       activePostmortemData: postmortemData,
+      activeTopologyData: topoData,
+      selectedTopologyNode: defaultNode,
+      activeBlastRadiusData: blastData,
+      activeChaosSimulation: null,
+      isChaosSimulated: false,
+      topologyLoading: false,
+      topologyError: null,
       selectedWhyLevel: 1,
       remediationSimState: {
         status: 'idle',
@@ -318,16 +386,16 @@ export async function loadScenarioDetails(scenarioKey) {
       selectedMilestoneIndex: null,
       isLoading: false
     });
-    resetCopilotChat();
-    resetRiskAdvisor();
+
     updateIncidentSummary(scenarioData);
     renderActiveView(store.getState().activeTab);
   } catch (err) {
     console.error('Failed to load scenario details:', err);
-    store.setState({ isLoading: false, error: err.message });
+    store.setState({ isLoading: false, error: err.message, topologyLoading: false });
     showError(`Error loading scenario: ${err.message}`);
   }
 }
+
 
 /**
  * Display a global error message.

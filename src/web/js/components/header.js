@@ -67,11 +67,8 @@ export function initHeader(onScenarioChange) {
   if (scenarioSelect) {
     scenarioSelect.addEventListener('change', (e) => {
       const selectedKey = e.target.value;
-      if (selectedKey) {
-        store.setState({ activeScenarioKey: selectedKey });
-        if (typeof onScenarioChange === 'function') {
-          onScenarioChange(selectedKey);
-        }
+      if (selectedKey && typeof onScenarioChange === 'function') {
+        onScenarioChange(selectedKey);
       }
     });
   }

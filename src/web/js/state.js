@@ -9,6 +9,7 @@ class AppState {
       scenarios: [],
       activeScenarioKey: null,
       activeScenarioData: null,
+      scenarioToken: 0,
       activeTab: 'telemetry',
       providerMode: 'mock', // 'mock' is the strict default; 'live' requires explicit user action
       activeTimelineData: null,
@@ -38,6 +39,13 @@ class AppState {
       riskAnalysisResult: null,
       riskAdvisorLoading: false,
       riskAdvisorError: null,
+      activeTopologyData: null,
+      selectedTopologyNode: null,
+      activeBlastRadiusData: null,
+      activeChaosSimulation: null,
+      isChaosSimulated: false,
+      topologyLoading: false,
+      topologyError: null,
       gcpConfig: {
         project_id: 'project-a47199cc-a109-4cd5-917',
         region: 'us-central1',
@@ -45,6 +53,7 @@ class AppState {
       },
       isLoading: false,
       error: null
+
     };
 
     this.listeners = new Set();
