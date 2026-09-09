@@ -485,6 +485,7 @@ class VertexAiCopilotEngine(BaseCopilotEngine):
 
         chat_resp = ChatResponse.model_validate_json(raw_text)
         chat_resp.scenario_key = scenario_key
+        chat_resp.provider = "live"
 
         # Validate grounding
         is_grounded, failed_claims = CopilotGroundingVerifier.verify(chat_resp, incident)
@@ -495,9 +496,19 @@ class VertexAiCopilotEngine(BaseCopilotEngine):
 
 
 def get_copilot_engine(provider: str | None = None) -> BaseCopilotEngine:
-    """Factory returning the configured SRE Copilot engine."""
+    """Factory returning the configured SRE Copilot engine.
+
+    Deterministic mappings:
+    - 'live' / 'vertex' / 'gemini' -> VertexAiCopilotEngine (Strict: No silent fallback to mock)
+    - 'mock' / 'deterministic' -> MockCopilotEngine
+    - 'auto' -> VertexAiCopilotEngine if credentials present, else MockCopilotEngine
+    """
     mode = (provider or config.diagnostic_provider).lower()
     if mode in ("vertex", "live", "gemini"):
+        return VertexAiCopilotEngine()
+    elif mode in ("mock", "deterministic"):
+        return MockCopilotEngine()
+    elif mode == "auto":
         if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"):
             try:
                 return VertexAiCopilotEngine()

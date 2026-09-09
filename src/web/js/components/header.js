@@ -75,16 +75,29 @@ export function initHeader(onScenarioChange) {
 
   if (btnMock) {
     btnMock.addEventListener('click', () => {
+      const prev = store.getState().providerMode;
       store.setState({ providerMode: 'mock' });
       updateProviderToggle('mock');
+      if (prev !== 'mock') {
+        const activeKey = store.getState().activeScenarioKey;
+        if (activeKey && typeof onScenarioChange === 'function') {
+          onScenarioChange(activeKey);
+        }
+      }
     });
   }
 
   if (btnLive) {
     btnLive.addEventListener('click', () => {
-      // Switch provider mode setting (Zero auto-inference triggered)
+      const prev = store.getState().providerMode;
       store.setState({ providerMode: 'live' });
       updateProviderToggle('live');
+      if (prev !== 'live') {
+        const activeKey = store.getState().activeScenarioKey;
+        if (activeKey && typeof onScenarioChange === 'function') {
+          onScenarioChange(activeKey);
+        }
+      }
     });
   }
 

@@ -44,6 +44,8 @@ export function renderRcaWorkspace(container) {
 
   // Categorize evidence
   const observedEvidence = evidenceList;
+  const diagProvider = diagData.provider || 'mock';
+  const isLiveDiag = diagProvider === 'live';
 
   container.innerHTML = `
     <div class="rca-workspace">
@@ -55,6 +57,9 @@ export function renderRcaWorkspace(container) {
             <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
               <span class="rca-category-tag">${escapeHtml(rc.category || 'SYSTEM_FAILURE')}</span>
               <span class="badge badge-critical font-mono" style="font-size: 10px;">${escapeHtml(report.service_name || 'Service')}</span>
+              <span class="badge ${isLiveDiag ? 'badge-warning' : 'badge-info'} font-mono" style="font-size: 10px;">
+                ${isLiveDiag ? 'Live Vertex AI' : 'Deterministic Mock'}
+              </span>
             </div>
             <h2 class="rca-hero-title">${escapeHtml(rc.title || 'Root Cause Identified')}</h2>
           </div>

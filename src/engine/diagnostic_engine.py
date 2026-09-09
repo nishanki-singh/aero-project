@@ -623,21 +623,25 @@ class VertexAiDiagnosticEngine(BaseDiagnosticEngine):
 
 
 def get_diagnostic_engine(provider: str | None = None) -> BaseDiagnosticEngine:
-    """Factory creating the appropriate diagnostic engine instance."""
-    mode = provider or config.diagnostic_provider
-    if mode == "vertex":
+    """Factory creating the appropriate diagnostic engine instance.
+
+    Deterministic mappings:
+    - 'live' / 'vertex' / 'gemini' -> VertexAiDiagnosticEngine (Strict: No silent fallback to mock)
+    - 'mock' / 'deterministic' -> MockDiagnosticEngine
+    - 'auto' -> VertexAiDiagnosticEngine if credentials present, else MockDiagnosticEngine
+    """
+    mode = (provider or config.diagnostic_provider).lower()
+    if mode in ("vertex", "live", "gemini"):
         return VertexAiDiagnosticEngine()
-    elif mode == "mock":
+    elif mode in ("mock", "deterministic"):
         return MockDiagnosticEngine()
     elif mode == "auto":
         import os
         if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"):
             try:
-                engine = VertexAiDiagnosticEngine()
-                return engine
+                return VertexAiDiagnosticEngine()
             except Exception:  # noqa: BLE001
                 return MockDiagnosticEngine()
-
         return MockDiagnosticEngine()
     else:
         return MockDiagnosticEngine()

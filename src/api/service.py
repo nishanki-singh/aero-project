@@ -12,13 +12,13 @@ from src.api.schemas import (
     ScenarioSummaryResponse,
 )
 from src.benchmark.scenarios import BENCHMARK_SCENARIOS
-from src.chat.engine import get_copilot_engine
+from src.chat.engine import VertexAiCopilotEngine, get_copilot_engine
 from src.chat.grounding import CopilotGroundingVerifier
 from src.config import config
-from src.engine.diagnostic_engine import get_diagnostic_engine
+from src.engine.diagnostic_engine import VertexAiDiagnosticEngine, get_diagnostic_engine
 from src.engine.grounding_verifier import GroundingVerifier
 from src.evaluation.evaluator import BenchmarkEvaluationReport, IncidentEvaluator
-from src.postmortem.engine import get_postmortem_engine
+from src.postmortem.engine import VertexAiPostmortemEngine, get_postmortem_engine
 from src.postmortem.exporter import PostmortemExporter
 from src.risk.engine import DeterministicRiskEngine
 from src.schemas.chat import ChatResponse
@@ -41,11 +41,11 @@ from src.topology.graph import build_canonical_topology_graph
 
 
 class AeroService:
-    """Core AERO orchestrator mediating business workflows."""
+    """Core business logic service executing operations across AI and benchmark models."""
 
     @classmethod
     def get_health(cls) -> HealthResponse:
-        """Returns runtime health status and GCP configuration."""
+        """Returns service health status and environment details."""
         return HealthResponse(
             status="HEALTHY",
             version="1.0.0",
@@ -56,7 +56,7 @@ class AeroService:
 
     @classmethod
     def get_config(cls) -> ConfigResponse:
-        """Returns active model and provider configuration."""
+        """Returns public environment configuration metadata."""
         return ConfigResponse(
             project_id=config.project_id,
             region=config.region,
@@ -106,10 +106,12 @@ class AeroService:
         duration_sec = round(time.perf_counter() - start_time, 3)
 
         grounding = GroundingVerifier.verify(report, incident)
+        provider_name = "live" if isinstance(engine, VertexAiDiagnosticEngine) else "mock"
         return DiagnoseResponse(
             report=report,
             grounding=grounding,
             duration_sec=duration_sec,
+            provider=provider_name,
         )
 
     @classmethod
@@ -147,10 +149,12 @@ class AeroService:
         engine = get_postmortem_engine(provider=provider)
         pm = engine.generate_postmortem(incident, diagnostic_report, timeline)
         md = PostmortemExporter.to_markdown(pm)
+        provider_name = "live" if isinstance(engine, VertexAiPostmortemEngine) else "mock"
 
         return PostmortemResponse(
             postmortem=pm,
             markdown=md,
+            provider=provider_name,
         )
 
     @classmethod
@@ -185,6 +189,7 @@ class AeroService:
 
         engine = get_copilot_engine(provider=provider)
         response = engine.ask(incident, diagnostic_report, timeline, message, scenario_key)
+        response.provider = "live" if isinstance(engine, VertexAiCopilotEngine) else "mock"
 
         # Grounding validation
         is_grounded, failed_claims = CopilotGroundingVerifier.verify(response, incident)

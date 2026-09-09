@@ -14,6 +14,8 @@ const QUICK_PROMPTS = [
   'What evidence is still missing?'
 ];
 
+let isCopilotSubscribed = false;
+
 /**
  * Initialize Copilot Drawer DOM and event listeners.
  */
@@ -37,6 +39,23 @@ export function initCopilotDrawer() {
   }
 
   renderDrawerStructure(drawer);
+
+  if (!isCopilotSubscribed) {
+    isCopilotSubscribed = true;
+    store.subscribe((state, prevState) => {
+      if (state.providerMode !== prevState.providerMode) {
+        const drawerEl = document.getElementById('copilot-drawer');
+        if (drawerEl) {
+          const badge = drawerEl.querySelector('.copilot-eyebrow .badge');
+          if (badge) {
+            const isLive = state.providerMode === 'live';
+            badge.className = `badge ${isLive ? 'badge-warning' : 'badge-healthy'} font-mono`;
+            badge.textContent = isLive ? 'Live Vertex AI' : 'Deterministic Mock';
+          }
+        }
+      }
+    });
+  }
 }
 
 const MIN_DRAWER_WIDTH = 380;
@@ -52,6 +71,7 @@ function renderDrawerStructure(drawer) {
   const scenarioKey = state.activeScenarioKey || 'oom_kill';
   const scenarioData = state.activeScenarioData;
   const svc = scenarioData?.incident?.metadata?.service_name || scenarioKey;
+  const isLive = state.providerMode === 'live';
 
   // Apply current width if custom
   if (currentDrawerWidth && currentDrawerWidth !== DEFAULT_DRAWER_WIDTH) {
@@ -67,7 +87,9 @@ function renderDrawerStructure(drawer) {
       <div class="copilot-header-title-group">
         <div class="copilot-eyebrow">
           <span>⚡ AERO SRE COPILOT</span>
-          <span class="badge badge-healthy font-mono" style="font-size: 9.5px;">Grounded</span>
+          <span class="badge ${isLive ? 'badge-warning' : 'badge-healthy'} font-mono" style="font-size: 9.5px;">
+            ${isLive ? 'Live Vertex AI' : 'Deterministic Mock'}
+          </span>
         </div>
         <div class="copilot-title">Incident Investigation Assistant</div>
       </div>
@@ -309,6 +331,7 @@ async function submitUserMessage(userMessage) {
 
   const state = store.getState();
   const scenarioKey = state.activeScenarioKey || 'oom_kill';
+  const provider = state.providerMode || 'mock';
 
   // Append user message to history
   const updatedMessages = [
@@ -324,7 +347,7 @@ async function submitUserMessage(userMessage) {
   renderMessages();
 
   try {
-    const response = await api.sendChatMessage(scenarioKey, userMessage.trim());
+    const response = await api.sendChatMessage(scenarioKey, userMessage.trim(), provider);
     const finalMessages = [
       ...store.getState().copilotMessages,
       { role: 'aero', data: response, timestamp: new Date() }
@@ -386,6 +409,8 @@ function renderMessages() {
       const inferences = resp.inferences || [];
       const recommendations = resp.recommendations || [];
       const isGrounded = resp.grounded !== false;
+      const respProvider = resp.provider || 'mock';
+      const isLiveResp = respProvider === 'live';
 
       html += `
         <div class="chat-msg-aero">
@@ -394,6 +419,9 @@ function renderMessages() {
             <div class="aero-msg-brand">
               <span>⚡</span>
               <span>AERO REASONING</span>
+              <span class="badge ${isLiveResp ? 'badge-warning' : 'badge-info'}" style="font-size: 9px; margin-left: 6px;">
+                ${isLiveResp ? 'Live Vertex AI' : 'Deterministic Mock'}
+              </span>
             </div>
             <span class="badge ${isGrounded ? 'badge-healthy' : 'badge-warning'}" style="font-size: 9.5px;">
               ${isGrounded ? '✓ Verified Grounded' : '⚠️ Partial Evidence'}

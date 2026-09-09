@@ -55,6 +55,9 @@ export function renderPostmortemStudio(container) {
     ? new Date(pm.created_at).toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
     : '2026-08-30 14:30:00 UTC';
 
+  const pmProvider = pmData.provider || 'mock';
+  const isLivePm = pmProvider === 'live';
+
   container.innerHTML = `
     <div class="postmortem-workspace">
       
@@ -66,6 +69,9 @@ export function renderPostmortemStudio(container) {
             <div class="postmortem-doc-eyebrow">
               <span>⚡ GOOGLE SRE POSTMORTEM STUDIO</span>
               <span class="badge badge-healthy font-mono" style="font-size: 10px;">${escapeHtml(pm.status || 'PUBLISHED')}</span>
+              <span class="badge ${isLivePm ? 'badge-warning' : 'badge-info'} font-mono" style="font-size: 10px;">
+                ${isLivePm ? 'Live Vertex AI' : 'Deterministic Mock'}
+              </span>
             </div>
             <h1 class="postmortem-doc-title">${escapeHtml(pm.title || 'Incident Postmortem Report')}</h1>
           </div>

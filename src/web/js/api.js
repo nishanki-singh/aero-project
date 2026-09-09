@@ -113,11 +113,11 @@ export const api = {
 
   /**
    * Fetch structured diagnostic report and evidence grounding for a scenario.
-   * @param {string} scenarioKey 
-   * @param {string|null} provider 
-   * @param {number} seed 
+   * @param {string} scenarioKey
+   * @param {string} provider
+   * @param {number} seed
    */
-  async getScenarioDiagnosis(scenarioKey, provider = null, seed = 42) {
+  async getScenarioDiagnosis(scenarioKey, provider = 'mock', seed = 42) {
     const providerParam = provider ? `&provider=${encodeURIComponent(provider)}` : '';
     const res = await fetch(
       `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/diagnose?seed=${seed}${providerParam}`
@@ -127,21 +127,22 @@ export const api = {
 
   /**
    * Fetch quantitative benchmark evaluation metrics for a scenario.
-   * @param {string} scenarioKey 
-   * @param {string} provider 
-   * @param {number} seed 
+   * @param {string} scenarioKey
+   * @param {string} provider
+   * @param {number} seed
    */
   async getScenarioEvaluation(scenarioKey, provider = 'mock', seed = 42) {
+    const providerParam = provider ? `&provider=${encodeURIComponent(provider)}` : '';
     const res = await fetch(
-      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/evaluation?provider=${encodeURIComponent(provider)}&seed=${seed}`
+      `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/evaluation?seed=${seed}${providerParam}`
     );
     return handleResponse(res);
   },
 
   /**
    * Run AI diagnosis on an arbitrary incident telemetry payload.
-   * @param {object} incident 
-   * @param {string|null} provider 
+   * @param {object} incident
+   * @param {string} provider
    */
   async runDiagnosis(incident, provider = 'mock') {
     const res = await fetch(`${API_BASE}/api/diagnose`, {
@@ -155,10 +156,10 @@ export const api = {
   /**
    * Fetch publication-ready Google SRE postmortem and Markdown for a scenario.
    * @param {string} scenarioKey
-   * @param {string|null} provider
+   * @param {string} provider
    * @param {number} seed
    */
-  async getScenarioPostmortem(scenarioKey, provider = null, seed = 42) {
+  async getScenarioPostmortem(scenarioKey, provider = 'mock', seed = 42) {
     const providerParam = provider ? `&provider=${encodeURIComponent(provider)}` : '';
     const res = await fetch(
       `${API_BASE}/api/scenarios/${encodeURIComponent(scenarioKey)}/postmortem?seed=${seed}${providerParam}`
@@ -170,10 +171,10 @@ export const api = {
    * Send question to Grounded SRE Copilot.
    * @param {string} scenarioKey
    * @param {string} message
-   * @param {string|null} provider
+   * @param {string} provider
    * @param {number} seed
    */
-  async sendChatMessage(scenarioKey, message, provider = null, seed = 42) {
+  async sendChatMessage(scenarioKey, message, provider = 'mock', seed = 42) {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -320,13 +320,14 @@ export async function loadScenarioDetails(scenarioKey) {
     });
 
     // 3. Fetch scenario telemetry pack, synthesized timeline, replay series, diagnosis, evaluation, postmortem, and topology in parallel
+    const currentProvider = store.getState().providerMode || 'mock';
     const [scenarioData, timelineData, replayData, diagData, evalData, postmortemData, topoData] = await Promise.all([
       api.getScenarioByKey(scenarioKey),
       api.getScenarioTimeline(scenarioKey),
       api.getScenarioReplay(scenarioKey, 60),
-      api.getScenarioDiagnosis(scenarioKey),
-      api.getScenarioEvaluation(scenarioKey),
-      api.getScenarioPostmortem(scenarioKey),
+      api.getScenarioDiagnosis(scenarioKey, currentProvider),
+      api.getScenarioEvaluation(scenarioKey, currentProvider),
+      api.getScenarioPostmortem(scenarioKey, currentProvider),
       api.getTopology(scenarioKey).catch(() => null)
     ]);
 

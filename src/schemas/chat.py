@@ -45,6 +45,10 @@ class ChatResponse(BaseModel):
         description="Actionable SRE recommendations and next verification steps (informational only).",
     )
     confidence: float = Field(default=0.95, ge=0.0, le=1.0, description="Overall confidence score.")
+    provider: str = Field(
+        default="mock",
+        description="AI provider that generated the response ('mock' or 'live').",
+    )
     grounded: bool = Field(
         default=True,
         description="True if all cited evidence items strictly exist in active telemetry.",

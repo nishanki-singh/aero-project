@@ -69,6 +69,8 @@ def get_scenario_diagnosis(
         return AeroService.diagnose(bundle.incident, provider=provider)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Diagnostic reasoning failed: {e!s}")
 
 
 @router.get("/{scenario_key}/evaluation", response_model=ScenarioEvaluationResult, summary="Get quantitative benchmark evaluation score")
@@ -84,6 +86,8 @@ def get_scenario_evaluation(
         return IncidentEvaluator.evaluate_scenario(bundle, engine)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Benchmark evaluation failed: {e!s}")
 
 
 @router.get("/{scenario_key}/postmortem", response_model=PostmortemResponse, summary="Get generated postmortem and markdown for scenario")
@@ -98,4 +102,6 @@ def get_scenario_postmortem(
         return AeroService.generate_postmortem(bundle.incident, provider=provider)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Postmortem generation failed: {e!s}")
 

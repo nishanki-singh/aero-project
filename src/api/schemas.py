@@ -50,6 +50,7 @@ class DiagnoseResponse(BaseModel):
     report: AeroDiagnosticReport = Field(..., description="Structured diagnostic report.")
     grounding: GroundingVerificationResult = Field(..., description="Deterministic grounding verification result.")
     duration_sec: float = Field(..., description="Inference and verification duration in seconds.")
+    provider: str = Field(default="mock", description="Engine provider that generated the report ('mock' or 'live').")
 
 
 class TimelineRequest(BaseModel):
@@ -75,6 +76,7 @@ class PostmortemResponse(BaseModel):
     """Postmortem output including structured JSON and publication-ready Markdown."""
     postmortem: AeroPostmortem = Field(..., description="Structured Google SRE postmortem object.")
     markdown: str = Field(..., description="Formatted publication-ready Markdown document.")
+    provider: str = Field(default="mock", description="Engine provider that authored the postmortem ('mock' or 'live').")
 
 
 class EvaluationRequest(BaseModel):

@@ -592,11 +592,17 @@ class VertexAiPostmortemEngine(BasePostmortemEngine):
 
 
 def get_postmortem_engine(provider: str | None = None) -> BasePostmortemEngine:
-    """Factory creating the appropriate postmortem engine instance."""
-    mode = provider or config.diagnostic_provider
-    if mode == "vertex":
+    """Factory creating the appropriate postmortem engine instance.
+
+    Deterministic mappings:
+    - 'live' / 'vertex' / 'gemini' -> VertexAiPostmortemEngine (Strict: No silent fallback to mock)
+    - 'mock' / 'deterministic' -> MockPostmortemEngine
+    - 'auto' -> VertexAiPostmortemEngine if credentials present, else MockPostmortemEngine
+    """
+    mode = (provider or config.diagnostic_provider).lower()
+    if mode in ("vertex", "live", "gemini"):
         return VertexAiPostmortemEngine()
-    elif mode == "mock":
+    elif mode in ("mock", "deterministic"):
         return MockPostmortemEngine()
     elif mode == "auto":
         import os
