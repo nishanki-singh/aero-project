@@ -1,78 +1,93 @@
 /**
  * AERO Pre-Deployment Risk Advisor Component
  * Evaluates proposed deployment/configuration changes before production release.
- * 3-Tier separation: Observed Change Facts -> Derived Risk Assessment -> Recommended Preventive Actions.
+ * Checks proposed changes against:
+ * 1. Incident diagnosis root cause & observed telemetry (Recurrence Prevention)
+ * 2. AERO mitigation recommendations
+ * 3. 18 Generic SRE deployment safety rules
  */
 
 import { api } from '../api.js';
 import { store } from '../state.js';
 
-const PRESET_CHANGES = {
-  uncapped_jvm: {
-    label: 'Uncapped JVM Heap',
+export const PRESET_CHANGES = {
+  aero_recommended: {
+    label: 'AERO Recommended Fix',
     service: 'worker-service',
     change_type: 'deployment',
-    description: 'Bump JVM worker pool image to latest without memory limits and with debug logging enabled.',
+    description: 'Deploy worker-service v1.9.1 with 2048MB memory limit, 10 workers concurrency, readiness probe enabled, and validated rollback target.',
     environment: 'production',
+    rollback_plan: 'Rollback to v1.9.0 within 60s if error rate > 1%',
     parameters: {
-      image_tag: 'latest',
-      debug_mode: true,
-      log_level: 'DEBUG',
-      memory_request_mb: 1024
-    }
-  },
-  db_pool_starvation: {
-    label: 'DB Pool Starvation',
-    service: 'order-service',
-    change_type: 'config',
-    description: 'Reduce database pool max size to 2 connections with 45s downstream RPC timeout.',
-    environment: 'production',
-    parameters: {
-      pool_max_size: 2,
-      timeout_ms: 45000,
-      downstream_timeout_ms: 45000,
-      upstream_timeout_ms: 10000
-    }
-  },
-  missing_readiness: {
-    label: 'Missing Readiness Probe',
-    service: 'checkout-service',
-    change_type: 'deployment',
-    description: 'Deploy checkout-service v2.5.0 with disabled readiness probe and aggressive 2s liveness delay.',
-    environment: 'production',
-    parameters: {
-      image_tag: 'v2.5.0',
-      readiness_probe_enabled: false,
-      liveness_initial_delay_seconds: 2
-    }
-  },
-  safe_canary: {
-    label: 'Safe Canary Rollout',
-    service: 'payment-service',
-    change_type: 'deployment',
-    description: 'Canary rollout of payment-service v2.4.2 with verified resource limits and rollback target.',
-    environment: 'production',
-    rollback_plan: 'Rollback to v2.4.1 within 60s if p99 latency > 300ms',
-    parameters: {
-      image_tag: 'v2.4.2',
+      image_tag: 'v1.9.1',
       memory_limit_mb: 2048,
       memory_request_mb: 1024,
       cpu_limit_cores: 2.0,
       cpu_request_cores: 1.0,
+      concurrency: 10,
       pool_max_size: 25,
-      timeout_ms: 3000,
       readiness_probe_enabled: true,
       liveness_initial_delay_seconds: 15,
-      rollback_version: 'v2.4.1'
+      rollback_version: 'v1.9.0',
+      debug_mode: false
+    }
+  },
+  unsafe_insufficient_memory: {
+    label: 'Unsafe Fix — Insufficient Memory',
+    service: 'worker-service',
+    change_type: 'deployment',
+    description: 'Deploy worker-service with 512MB memory limit (below observed 1.95GB peak) and unversioned latest image without rollback plan.',
+    environment: 'production',
+    rollback_plan: '',
+    parameters: {
+      image_tag: 'latest',
+      memory_limit_mb: 512,
+      memory_request_mb: 256,
+      concurrency: 10
+    }
+  },
+  unsafe_increased_concurrency: {
+    label: 'Unsafe Fix — Increased Concurrency',
+    service: 'worker-service',
+    change_type: 'deployment',
+    description: 'Increase worker concurrency from 10 to 100 with baseline 1024MB memory limit, multiplying per-worker heap allocations.',
+    environment: 'production',
+    rollback_plan: 'Revert to v1.9.0',
+    parameters: {
+      image_tag: 'v1.9.1',
+      memory_limit_mb: 1024,
+      memory_request_mb: 512,
+      concurrency: 100,
+      rollback_version: 'v1.9.0'
+    }
+  },
+  unrelated_fix: {
+    label: 'Unrelated Fix',
+    service: 'worker-service',
+    change_type: 'config',
+    description: 'Update logging configuration and connection pool settings without addressing memory limits or worker concurrency.',
+    environment: 'production',
+    rollback_plan: 'Revert logging config',
+    parameters: {
+      pool_max_size: 30,
+      timeout_ms: 3000,
+      readiness_probe_enabled: true,
+      rollback_version: 'v1.9.0'
     }
   }
 };
 
+// Aliases for backwards compatibility
+PRESET_CHANGES.uncapped_jvm = PRESET_CHANGES.unsafe_insufficient_memory;
+PRESET_CHANGES.db_pool_starvation = PRESET_CHANGES.unsafe_increased_concurrency;
+PRESET_CHANGES.missing_readiness = PRESET_CHANGES.unrelated_fix;
+PRESET_CHANGES.safe_canary = PRESET_CHANGES.aero_recommended;
+
 const MIN_DRAWER_WIDTH = 420;
-const DEFAULT_DRAWER_WIDTH = 680;
-const EXPANDED_DRAWER_WIDTH = 960;
+const DEFAULT_DRAWER_WIDTH = 700;
+const EXPANDED_DRAWER_WIDTH = 980;
 let currentDrawerWidth = DEFAULT_DRAWER_WIDTH;
-let activePresetKey = 'uncapped_jvm';
+let activePresetKey = 'aero_recommended';
 
 /**
  * Initialize Risk Advisor Drawer DOM and event listeners.
@@ -106,13 +121,13 @@ function renderDrawerStructure(drawer) {
   const state = store.getState();
   const scenarioKey = state.activeScenarioKey || 'oom_kill';
   const scenarioData = state.activeScenarioData;
-  const svc = scenarioData?.incident?.metadata?.service_name || scenarioKey;
+  const svc = scenarioData?.incident?.metadata?.service_name || scenarioData?.incident?.metadata?.affected_service || 'worker-service';
 
   if (currentDrawerWidth && currentDrawerWidth !== DEFAULT_DRAWER_WIDTH) {
     drawer.style.width = `${currentDrawerWidth}px`;
   }
 
-  const preset = PRESET_CHANGES[activePresetKey] || PRESET_CHANGES.uncapped_jvm;
+  const preset = PRESET_CHANGES[activePresetKey] || PRESET_CHANGES.aero_recommended;
 
   drawer.innerHTML = `
     <!-- Left Boundary Drag Handle for Resizing -->
@@ -123,9 +138,9 @@ function renderDrawerStructure(drawer) {
       <div class="risk-header-title-group">
         <div class="risk-eyebrow">
           <span>🛡️ PRE-DEPLOYMENT RISK ADVISOR</span>
-          <span class="badge badge-info font-mono" style="font-size: 9.5px;">Advisory Only</span>
+          <span class="badge badge-info font-mono" style="font-size: 9.5px;">Prevention Gate</span>
         </div>
-        <div class="risk-title">Change Safety & Anti-Pattern Evaluator</div>
+        <div class="risk-title">Change Safety & Recurrence Prevention</div>
       </div>
       <div class="risk-header-actions">
         <button type="button" class="risk-icon-btn" id="btn-risk-expand" title="Expand / Restore width (Toggle)">
@@ -137,23 +152,26 @@ function renderDrawerStructure(drawer) {
       </div>
     </div>
 
-    <!-- Active Incident Context Bar -->
+    <!-- Learning From Incident Evidence Context Bar -->
     <div class="risk-context-bar">
       <div class="font-mono" style="color: var(--text-main); font-size: 11px;">
-        <span>Active Incident Context:</span>
+        <span>Learning From Incident Evidence:</span>
         <span style="color: var(--accent-color); font-weight: 600;">${escapeHtml(svc)}</span>
         <span style="color: var(--text-muted); font-size: 10px;">(${escapeHtml(scenarioKey)})</span>
       </div>
-      <span class="badge badge-healthy" style="font-size: 9.5px;">Deterministic Rules</span>
+      <span class="badge badge-healthy" style="font-size: 9.5px;">Deterministic Prevention</span>
     </div>
 
     <!-- Preset Change Buttons -->
     <div class="risk-presets-bar">
-      ${Object.entries(PRESET_CHANGES).map(([k, v]) => `
-        <button type="button" class="preset-pill ${k === activePresetKey ? 'active' : ''}" data-preset="${escapeHtml(k)}">
-          ${escapeHtml(v.label)}
-        </button>
-      `).join('')}
+      ${['aero_recommended', 'unsafe_insufficient_memory', 'unsafe_increased_concurrency', 'unrelated_fix'].map((k) => {
+        const v = PRESET_CHANGES[k];
+        return `
+          <button type="button" class="preset-pill ${k === activePresetKey ? 'active' : ''}" data-preset="${escapeHtml(k)}">
+            ${escapeHtml(v.label)}
+          </button>
+        `;
+      }).join('')}
     </div>
 
     <!-- Body Scroll Container -->
@@ -184,7 +202,7 @@ function renderDrawerStructure(drawer) {
         </div>
 
         <div class="risk-form-group">
-          <label class="risk-label" for="risk-input-desc">Change Description & Release Scope</label>
+          <label class="risk-label" for="risk-input-desc">Proposed Change Description</label>
           <textarea id="risk-input-desc" class="risk-textarea" rows="2">${escapeHtml(preset.description)}</textarea>
         </div>
 
@@ -194,16 +212,16 @@ function renderDrawerStructure(drawer) {
         </div>
 
         <div class="risk-form-group">
-          <label class="risk-label" for="risk-input-rollback">Rollback Plan / Recovery Target</label>
-          <input type="text" id="risk-input-rollback" class="risk-input" placeholder="e.g. Rollback to v2.4.0 within 60s" value="${escapeHtml(preset.rollback_plan || '')}" />
+          <label class="risk-label" for="risk-input-rollback">Rollback Plan / Target Version</label>
+          <input type="text" id="risk-input-rollback" class="risk-input" placeholder="e.g. Rollback to v1.9.0 within 60s" value="${escapeHtml(preset.rollback_plan || '')}" />
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
           <span style="font-size: 11px; color: var(--text-muted);">
-            Evaluates limits, pools, timeouts, probes, and drift.
+            Evaluates against diagnosed root cause, observed saturation, and SRE rules.
           </span>
           <button type="button" class="btn-risk-analyze" id="btn-risk-analyze">
-            <span>🛡️ Analyze Change Risk</span>
+            <span>🛡️ Evaluate Deployment Risk</span>
           </button>
         </div>
       </div>
@@ -222,7 +240,7 @@ function renderDrawerStructure(drawer) {
   const btnExpand = drawer.querySelector('#btn-risk-expand');
   if (btnExpand) {
     btnExpand.addEventListener('click', () => {
-      const maxW = Math.min(EXPANDED_DRAWER_WIDTH, Math.floor(window.innerWidth * 0.92));
+      const maxW = Math.min(EXPANDED_DRAWER_WIDTH, Math.floor(window.innerWidth * 0.94));
       if (currentDrawerWidth >= maxW - 30) {
         currentDrawerWidth = DEFAULT_DRAWER_WIDTH;
       } else {
@@ -287,7 +305,7 @@ function setupDrawerResize(drawer) {
   const onPointerMove = (e) => {
     if (!isDragging) return;
     const delta = startX - e.clientX;
-    const maxAllowed = Math.min(1200, Math.floor(window.innerWidth * 0.94));
+    const maxAllowed = Math.min(1200, Math.floor(window.innerWidth * 0.96));
     const minAllowed = Math.min(MIN_DRAWER_WIDTH, Math.floor(window.innerWidth * 0.85));
     const newWidth = Math.max(minAllowed, Math.min(maxAllowed, Math.round(startWidth + delta)));
 
@@ -359,7 +377,7 @@ export function resetRiskAdvisor() {
     riskAdvisorLoading: false,
     riskAdvisorError: null
   });
-  activePresetKey = 'uncapped_jvm';
+  activePresetKey = 'aero_recommended';
   const drawer = document.getElementById('risk-drawer');
   if (drawer) {
     renderDrawerStructure(drawer);
@@ -373,7 +391,7 @@ async function triggerRiskAnalysis() {
   const drawer = document.getElementById('risk-drawer');
   if (!drawer) return;
 
-  const svc = drawer.querySelector('#risk-input-service')?.value?.trim() || 'order-service';
+  const svc = drawer.querySelector('#risk-input-service')?.value?.trim() || 'worker-service';
   const changeType = drawer.querySelector('#risk-input-type')?.value || 'deployment';
   const env = drawer.querySelector('#risk-input-env')?.value || 'production';
   const desc = drawer.querySelector('#risk-input-desc')?.value?.trim() || 'Proposed change';
@@ -414,9 +432,9 @@ async function triggerRiskAnalysis() {
     console.error('Risk analysis request failed:', err);
     store.setState({
       riskAdvisorLoading: false,
-      riskAdvisorError: err.message || 'Failed to analyze proposed change.'
+      riskAdvisorError: err.message || 'Failed to evaluate deployment risk.'
     });
-    renderError(err.message || 'Failed to analyze proposed change.');
+    renderError(err.message || 'Failed to evaluate deployment risk.');
   }
 }
 
@@ -428,10 +446,10 @@ function renderLoading() {
     <div class="risk-results-card" style="align-items: center; justify-content: center; padding: 32px 20px;">
       <div class="copilot-spinner" style="width: 24px; height: 24px; margin-bottom: 12px;"></div>
       <div style="font-size: 13px; color: var(--text-main); font-weight: 600;">
-        Evaluating Deterministic SRE Risk Rules...
+        Evaluating Deployment Risk & Recurrence Prevention...
       </div>
       <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-        Cross-referencing resource limits, connection pools, timeouts, and active telemetry baseline.
+        Checking proposed change against diagnosed root cause, saturation evidence, and generic SRE safety rules.
       </div>
     </div>
   `;
@@ -449,21 +467,80 @@ function renderError(msg) {
 }
 
 /**
- * Render 3-Tier Risk Results: Observed Facts -> Derived Findings -> Preventive Recommendations.
+ * Render complete Risk Advisor Results Breakdown:
+ * - Deployment Risk & Decision Gate Banner
+ * - Evaluated Proposed Change Card
+ * - Diagnosis Alignment Card
+ * - Recurrence Risk Prediction Card
+ * - 1. Diagnosis-Aware Prevention Checks
+ * - 2. Generic SRE Safety Checks
+ * - 3. Recommended Preventive Actions
  */
 function renderResults(result) {
   const container = document.getElementById('risk-results-placeholder');
   if (!container) return;
 
   const severityClass = (result.overall_severity || 'LOW').toLowerCase();
-  const isBlocked = !result.is_safe_to_deploy;
-  const findings = result.findings || [];
-  const facts = result.observed_facts_summary || [];
+  const decision = result.decision || (result.is_safe_to_deploy ? 'SAFE' : 'BLOCKED');
+  const isBlocked = decision === 'BLOCKED' || decision === 'HIGH_RISK';
+  const isSafe = decision === 'SAFE';
+
+  const genericFindings = result.generic_findings || [];
+  const preventionFindings = result.prevention_findings || [];
+  const allFindings = result.findings || [...genericFindings, ...preventionFindings];
   const recs = result.preventive_recommendations || [];
+  const diagAlign = result.diagnosis_alignment || {};
+  const recPred = result.predicted_recurrence || {};
+  const evalChange = result.evaluated_change || {};
+  const evalParams = evalChange.parameters || {};
+
+  // Authoritative Evaluated Fields directly from API response
+  const evalSvc = evalChange.service || evalParams.service || 'worker-service';
+  const evalMem = evalChange.memory_limit_mb != null ? evalChange.memory_limit_mb : evalParams.memory_limit_mb;
+  const evalMemText = evalMem != null && evalMem !== '' ? `${evalMem} MB` : 'Uncapped';
+
+  const evalConc = evalChange.concurrency != null ? evalChange.concurrency : (evalParams.concurrency != null ? evalParams.concurrency : evalParams.worker_count);
+  const evalConcText = evalConc != null ? `${evalConc} workers` : 'Default';
+
+  const evalImage = evalChange.image_tag || evalParams.image_tag || 'latest';
+  const evalRollback = evalChange.rollback_plan || evalChange.rollback_version || evalParams.rollback_version || evalParams.rollback_plan;
+  const evalRollbackText = evalRollback ? (String(evalRollback).length > 45 ? `${String(evalRollback).slice(0, 42)}...` : String(evalRollback)) : 'None (Unconfigured)';
+
+  const evalDebug = evalChange.debug_mode === true || evalParams.debug_mode === true;
+  const evalDebugText = evalDebug ? 'Enabled (DEBUG)' : 'Disabled';
+
+  // Format decision gate label & badge class
+  let gateBadgeClass = 'safe';
+  let gateBadgeText = '🛡️ SAFE TO DEPLOY (SAFE)';
+  if (decision === 'BLOCKED') {
+    gateBadgeClass = 'blocked';
+    gateBadgeText = '🚫 DEPLOYMENT BLOCKED';
+  } else if (decision === 'HIGH_RISK') {
+    gateBadgeClass = 'blocked';
+    gateBadgeText = '⚠️ HIGH RISK DEPLOYMENT';
+  } else if (decision === 'WARNING') {
+    gateBadgeClass = 'caution';
+    gateBadgeText = '⚠️ PROCEED WITH CAUTION (WARNING)';
+  }
+
+  // Recurrence badge class
+  const recSev = (recPred.risk || 'LOW').toUpperCase();
+  let recBadgeClass = 'badge-healthy';
+  let recCardClass = 'safe';
+  if (recSev === 'CRITICAL') {
+    recBadgeClass = 'badge-critical';
+    recCardClass = '';
+  } else if (recSev === 'HIGH') {
+    recBadgeClass = 'badge-warning';
+    recCardClass = 'warning';
+  } else if (recSev === 'MEDIUM') {
+    recBadgeClass = 'badge-info';
+    recCardClass = 'warning';
+  }
 
   container.innerHTML = `
     <div class="risk-results-card">
-      <!-- Score & Gate Banner -->
+      <!-- 1. Deployment Risk & Gate Banner -->
       <div class="risk-score-banner">
         <div class="risk-score-group">
           <div class="risk-score-circle ${severityClass}">
@@ -472,88 +549,140 @@ function renderResults(result) {
           </div>
           <div>
             <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">
-              Overall Severity: <span style="text-transform: uppercase;">${escapeHtml(result.overall_severity)}</span>
+              Deployment Risk: <span style="text-transform: uppercase;">${escapeHtml(result.overall_severity)}</span>
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-              ${result.rule_evaluation_count} safety checks evaluated · Context: ${result.scenario_context_applied ? 'Telemetry Cross-Referenced' : 'Standalone'}
+              Score: ${result.risk_score}/100 · ${result.rule_evaluation_count || 13} deterministic checks evaluated
             </div>
           </div>
         </div>
 
         <div class="risk-gate-status">
-          <span class="gate-badge ${isBlocked ? 'blocked' : 'safe'}">
-            ${isBlocked ? '🚫 DEPLOYMENT BLOCKED' : '🛡️ SAFE TO DEPLOY'}
+          <span class="gate-badge ${gateBadgeClass}">
+            ${gateBadgeText}
           </span>
           <span style="font-size: 10px; color: var(--text-muted);">
-            ${isBlocked ? 'Mandatory guardrails required' : 'Proceed with canary rollout'}
+            ${isBlocked ? 'Pre-deployment blocking gates triggered' : 'Verified safe for rollout'}
           </span>
         </div>
       </div>
 
-      <!-- Explanation narrative -->
+      <!-- Narrative explanation -->
       <div class="risk-explanation-card">
         ${escapeHtml(result.explanation)}
       </div>
 
-      <!-- 1. Observed Change Facts -->
-      ${facts.length > 0 ? `
-        <div class="risk-facts-block">
-          <div class="facts-title">
-            <span>🔍</span>
-            <span>1. Observed Change Facts & Telemetry Baseline</span>
+      <!-- 2. Evaluated Proposed Change -->
+      <div class="risk-eval-change-card">
+        <div class="risk-eval-header">
+          <span>📦</span>
+          <span>EVALUATED PROPOSED CHANGE</span>
+        </div>
+        <div class="risk-eval-grid">
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Target Service</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalSvc)}</div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            ${facts.map((f) => `
-              <div class="fact-item">
-                <span style="color: #38bdf8; font-weight: 700;">•</span>
-                <div>${escapeHtml(f)}</div>
-              </div>
-            `).join('')}
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Memory Limit</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalMemText)}</div>
+          </div>
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Concurrency</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalConcText)}</div>
+          </div>
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Image Tag</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalImage)}</div>
+          </div>
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Rollback Target</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalRollbackText)}</div>
+          </div>
+          <div class="risk-eval-item">
+            <span class="risk-eval-label">Debug Mode</span>
+            <div class="risk-eval-val font-mono">${escapeHtml(evalDebugText)}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Diagnosis Alignment -->
+      ${diagAlign.root_cause ? `
+        <div class="risk-alignment-card">
+          <div class="alignment-title">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>🧠</span>
+              <span>DIAGNOSIS ALIGNMENT</span>
+            </div>
+            <span class="badge ${diagAlign.is_aligned ? 'badge-healthy' : 'badge-warning'}" style="font-size: 9.5px;">
+              ${diagAlign.is_aligned ? '✓ Aligned with Diagnosis' : '⚠️ Misaligned with Incident Findings'}
+            </span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px;">
+            <div><strong style="color: var(--text-muted);">Root Cause:</strong> <span style="color: var(--text-main);">${escapeHtml(diagAlign.root_cause)}</span></div>
+            <div><strong style="color: var(--text-muted);">Observed Evidence:</strong> <span style="color: #38bdf8;" class="font-mono">${escapeHtml(diagAlign.observed_peak || '99.8% memory saturation')}</span></div>
+            ${diagAlign.aero_recommendations && diagAlign.aero_recommendations.length > 0 ? `
+              <div><strong style="color: var(--text-muted);">AERO Recommendation:</strong> <span style="color: #34d399;">${escapeHtml(diagAlign.aero_recommendations[0])}</span></div>
+            ` : ''}
+            <div style="color: var(--text-secondary); margin-top: 2px; font-style: italic;">
+              ${escapeHtml(diagAlign.alignment_summary)}
+            </div>
           </div>
         </div>
       ` : ''}
 
-      <!-- 2. Derived Risk Findings -->
+      <!-- 4. Recurrence Prediction Card -->
+      <div class="risk-recurrence-card ${recCardClass}">
+        <div class="recurrence-header">
+          <div style="display: flex; align-items: center; gap: 6px; color: ${recSev === 'LOW' ? '#34d399' : (recSev === 'CRITICAL' ? '#f87171' : '#fbbf24')};">
+            <span>🔮</span>
+            <span>RECURRENCE RISK PREDICTION</span>
+          </div>
+          <span class="badge ${recBadgeClass}" style="font-size: 9.5px;">
+            ${escapeHtml(recPred.risk || 'LOW')} RECURRENCE RISK
+          </span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-main); line-height: 1.45;">
+          ${escapeHtml(recPred.reason || 'Proposed change satisfies verified safety constraints.')}
+        </div>
+      </div>
+
+      <!-- 5. Diagnosis-Aware Prevention Checks -->
+      ${preventionFindings.length > 0 ? `
+        <div class="risk-findings-block">
+          <div class="findings-header" style="color: #f87171;">
+            <span>🛡️</span>
+            <span>1. Diagnosis-Aware Prevention Checks (${preventionFindings.length})</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${preventionFindings.map((f) => renderFindingCard(f)).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- 6. Generic SRE Safety Checks -->
       <div class="risk-findings-block">
         <div class="findings-header">
-          <span>⚠️</span>
-          <span>2. Derived Risk Findings (${findings.length})</span>
+          <span>⚙️</span>
+          <span>${preventionFindings.length > 0 ? '2' : '1'}. Generic SRE Safety Checks (${genericFindings.length})</span>
         </div>
-        ${findings.length === 0 ? `
+        ${genericFindings.length === 0 ? `
           <div style="font-size: 12px; color: var(--text-muted); font-style: italic; padding: 8px;">
-            ✓ No anti-patterns detected. Proposed change satisfies standard SRE safety constraints.
+            ✓ All generic deployment safety checks passed (limits, connection pools, timeouts, probes, and rollback strategy).
           </div>
         ` : `
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${findings.map((f) => `
-              <div class="finding-card ${f.severity.toLowerCase()}">
-                <div class="finding-title-row">
-                  <span class="finding-title">${escapeHtml(f.title)}</span>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span class="badge ${getSeverityBadgeClass(f.severity)}" style="font-size: 9.5px;">${escapeHtml(f.severity)}</span>
-                    <span class="font-mono" style="font-size: 10px; color: var(--text-muted);">+${f.score_impact}pts</span>
-                  </div>
-                </div>
-                <div class="finding-reasoning">
-                  ${escapeHtml(f.derived_risk)}
-                </div>
-                ${f.recommendations && f.recommendations.length > 0 ? `
-                  <div style="font-size: 11px; color: #34d399; margin-top: 2px;">
-                    <strong>Fix:</strong> ${escapeHtml(f.recommendations[0])}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
+            ${genericFindings.map((f) => renderFindingCard(f)).join('')}
           </div>
         `}
       </div>
 
-      <!-- 3. Preventive Recommendations -->
+      <!-- 7. Recommended Preventive Actions -->
       ${recs.length > 0 ? `
         <div class="risk-recs-block">
           <div class="recs-title">
             <span>🛡️</span>
-            <span>3. Recommended Preventive Actions</span>
+            <span>Recommended Preventive Actions</span>
           </div>
           <div style="display: flex; flex-direction: column; gap: 6px;">
             ${recs.map((r) => `
@@ -563,6 +692,37 @@ function renderResults(result) {
               </div>
             `).join('')}
           </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderFindingCard(f) {
+  const sevClass = (f.severity || 'LOW').toLowerCase();
+  return `
+    <div class="finding-card ${sevClass}">
+      <div class="finding-title-row">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="font-mono" style="font-size: 10px; color: var(--text-muted);">${escapeHtml(f.rule_id || 'RULE')}</span>
+          <span class="finding-title">${escapeHtml(f.title)}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="badge ${getSeverityBadgeClass(f.severity)}" style="font-size: 9.5px;">${escapeHtml(f.severity)}</span>
+          <span class="font-mono" style="font-size: 10px; color: var(--text-muted);">+${f.score_impact}pts</span>
+        </div>
+      </div>
+      <div class="finding-reasoning">
+        ${escapeHtml(f.derived_risk)}
+      </div>
+      ${f.observed_facts && f.observed_facts.length > 0 ? `
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+          <strong>Evidence:</strong> ${escapeHtml(f.observed_facts[0])}
+        </div>
+      ` : ''}
+      ${f.recommendations && f.recommendations.length > 0 ? `
+        <div style="font-size: 11px; color: #34d399; margin-top: 2px;">
+          <strong>Fix:</strong> ${escapeHtml(f.recommendations[0])}
         </div>
       ` : ''}
     </div>

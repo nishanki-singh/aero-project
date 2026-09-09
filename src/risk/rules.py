@@ -1,23 +1,56 @@
-"""Deterministic risk rules and heuristic evaluators for AERO Pre-Deployment Risk Advisor."""
+"""Deterministic risk rules and heuristic evaluators for AERO Pre-Deployment Risk Advisor.
+
+Features:
+1. 18 Generic SRE Deployment Safety Rules (RISK-RES, RISK-POOL, RISK-TIMEOUT, RISK-PROBE, RISK-ROLLBACK, RISK-CONFIG, RISK-DRIFT, RISK-SERVICE)
+2. Diagnosis-Aware Recurrence Prevention Rules (RISK-PREV-001 through RISK-PREV-005)
+"""
 
 from __future__ import annotations
 
+from typing import Any
+
 from src.schemas.incident import Incident
-from src.schemas.risk import ProposedChange, RiskCategory, RiskFinding, RiskSeverity
+from src.schemas.risk import (
+    DiagnosisAlignmentInfo,
+    DiagnosisContext,
+    ProposedChange,
+    RecurrencePrediction,
+    RiskCategory,
+    RiskFinding,
+    RiskSeverity,
+)
 
 # Critical Tier-1 Services
 TIER_1_SERVICES = {"order-service", "checkout-service", "payment-service", "auth-service"}
 
 
+def _get_val(change: ProposedChange, *keys: str, default: Any = None) -> Any:
+    """Extract parameter value from ProposedChange direct attributes or parameters dict."""
+    for k in keys:
+        if hasattr(change, k):
+            v = getattr(change, k)
+            if v is not None:
+                return v
+        if change.parameters and k in change.parameters:
+            v = change.parameters[k]
+            if v is not None:
+                return v
+    return default
+
+
+# =============================================================================
+# 1. GENERIC RULES (18 PRESERVED RULES)
+# =============================================================================
+
+
 def check_resource_limits(change: ProposedChange, incident: Incident | None = None) -> list[RiskFinding]:
     """Evaluate resource limit regressions, missing constraints, and telemetry baseline mismatches."""
     findings: list[RiskFinding] = []
-    params = change.parameters
     env = change.environment.lower()
 
-    # Rule 1: Request exceeds limit
-    mem_req = params.get("memory_request_mb")
-    mem_lim = params.get("memory_limit_mb")
+    # Rule 1: Request exceeds limit (Memory)
+    mem_req = _get_val(change, "memory_request_mb", "memory_request")
+    mem_lim = _get_val(change, "memory_limit_mb", "memory_limit")
     if mem_req is not None and mem_lim is not None:
         try:
             req_val = float(mem_req)
@@ -46,8 +79,9 @@ def check_resource_limits(change: ProposedChange, incident: Incident | None = No
         except (ValueError, TypeError):
             pass
 
-    cpu_req = params.get("cpu_request_cores")
-    cpu_lim = params.get("cpu_limit_cores")
+    # Rule 1-CPU: CPU Request exceeds limit
+    cpu_req = _get_val(change, "cpu_request_cores", "cpu_request")
+    cpu_lim = _get_val(change, "cpu_limit_cores", "cpu_limit")
     if cpu_req is not None and cpu_lim is not None:
         try:
             req_c = float(cpu_req)
@@ -150,7 +184,7 @@ def check_resource_limits(change: ProposedChange, incident: Incident | None = No
                 pass
 
     # Rule 4: Unusually Large Resource Increase (>300% jump)
-    prev_mem = params.get("previous_memory_limit_mb")
+    prev_mem = _get_val(change, "previous_memory_limit_mb")
     if prev_mem is not None and mem_lim is not None:
         try:
             prev_val = float(prev_mem)
@@ -185,10 +219,9 @@ def check_resource_limits(change: ProposedChange, incident: Incident | None = No
 def check_database_pool(change: ProposedChange) -> list[RiskFinding]:
     """Evaluate database / worker connection pool size constraints."""
     findings: list[RiskFinding] = []
-    params = change.parameters
     env = change.environment.lower()
 
-    pool_size = params.get("pool_max_size") or params.get("db_pool_size") or params.get("max_connections")
+    pool_size = _get_val(change, "pool_max", "pool_max_size", "db_pool_size", "max_connections")
     if pool_size is not None:
         try:
             val = int(pool_size)
@@ -242,9 +275,15 @@ def check_database_pool(change: ProposedChange) -> list[RiskFinding]:
 def check_timeouts_and_dependencies(change: ProposedChange) -> list[RiskFinding]:
     """Evaluate timeout configurations and cascading failure risks."""
     findings: list[RiskFinding] = []
-    params = change.parameters
 
-    timeout_ms = params.get("timeout_ms") if "timeout_ms" in params else params.get("client_timeout_ms")
+    timeout_ms = _get_val(change, "timeout_ms", "client_timeout_ms")
+    timeout_sec = _get_val(change, "timeout_seconds")
+    if timeout_ms is None and timeout_sec is not None:
+        try:
+            timeout_ms = int(float(timeout_sec) * 1000)
+        except (ValueError, TypeError):
+            pass
+
     if timeout_ms is not None:
         try:
             t_val = int(timeout_ms)
@@ -290,8 +329,8 @@ def check_timeouts_and_dependencies(change: ProposedChange) -> list[RiskFinding]
             pass
 
     # Downstream timeout > Upstream timeout
-    downstream_t = params.get("downstream_timeout_ms")
-    upstream_t = params.get("upstream_timeout_ms")
+    downstream_t = _get_val(change, "downstream_timeout_ms")
+    upstream_t = _get_val(change, "upstream_timeout_ms")
     if downstream_t is not None and upstream_t is not None:
         try:
             d_val = int(downstream_t)
@@ -327,10 +366,10 @@ def check_timeouts_and_dependencies(change: ProposedChange) -> list[RiskFinding]
 def check_health_and_readiness(change: ProposedChange) -> list[RiskFinding]:
     """Evaluate health check, readiness probe, and startup safeguards."""
     findings: list[RiskFinding] = []
-    params = change.parameters
     env = change.environment.lower()
 
-    if "readiness_probe_enabled" in params and not params["readiness_probe_enabled"] and env == "production":
+    readiness = _get_val(change, "readiness_probe_enabled")
+    if readiness is False and env == "production":
         findings.append(
             RiskFinding(
                 rule_id="RISK-PROBE-001",
@@ -350,7 +389,7 @@ def check_health_and_readiness(change: ProposedChange) -> list[RiskFinding]:
             )
         )
 
-    init_delay = params.get("liveness_initial_delay_seconds")
+    init_delay = _get_val(change, "liveness_initial_delay_seconds")
     if init_delay is not None:
         try:
             delay_val = int(init_delay)
@@ -382,12 +421,11 @@ def check_health_and_readiness(change: ProposedChange) -> list[RiskFinding]:
 def check_rollback_strategy(change: ProposedChange) -> list[RiskFinding]:
     """Evaluate rollback preparedness and image tagging hygiene."""
     findings: list[RiskFinding] = []
-    params = change.parameters
     env = change.environment.lower()
 
     # Check unversioned latest tag
-    image_tag = params.get("image_tag", "") or ""
-    if image_tag.lower() == "latest" and env == "production":
+    image_tag = _get_val(change, "image_tag", default="") or ""
+    if str(image_tag).lower() == "latest" and env == "production":
         findings.append(
             RiskFinding(
                 rule_id="RISK-ROLLBACK-001",
@@ -408,7 +446,7 @@ def check_rollback_strategy(change: ProposedChange) -> list[RiskFinding]:
         )
 
     # Missing rollback plan on production deployment
-    has_rollback = bool(change.rollback_plan or params.get("rollback_version"))
+    has_rollback = bool(change.rollback_plan or _get_val(change, "rollback_version"))
     if not has_rollback and env == "production" and change.change_type in ["deployment", "config"]:
         findings.append(
             RiskFinding(
@@ -435,11 +473,12 @@ def check_rollback_strategy(change: ProposedChange) -> list[RiskFinding]:
 def check_dangerous_config(change: ProposedChange) -> list[RiskFinding]:
     """Evaluate dangerous runtime flags, insecure settings, and debug logging."""
     findings: list[RiskFinding] = []
-    params = change.parameters
     env = change.environment.lower()
 
     if env == "production":
-        debug_active = params.get("debug_mode") is True or str(params.get("log_level", "")).upper() == "DEBUG"
+        debug_mode = _get_val(change, "debug_mode")
+        log_level = _get_val(change, "log_level", default="")
+        debug_active = debug_mode is True or str(log_level).upper() == "DEBUG"
         if debug_active:
             findings.append(
                 RiskFinding(
@@ -448,7 +487,7 @@ def check_dangerous_config(change: ProposedChange) -> list[RiskFinding]:
                     severity=RiskSeverity.HIGH,
                     category=RiskCategory.DANGEROUS_CONFIG,
                     observed_facts=[
-                        f"Debug flag detected: debug_mode={params.get('debug_mode')}, log_level={params.get('log_level')}."
+                        f"Debug flag detected: debug_mode={debug_mode}, log_level={log_level}."
                     ],
                     derived_risk=(
                         "Verbose debug logging degrades CPU and disk I/O throughput by 20-40%, risks logging sensitive "
@@ -462,7 +501,8 @@ def check_dangerous_config(change: ProposedChange) -> list[RiskFinding]:
                 )
             )
 
-        if params.get("allow_insecure_transport") is True or params.get("disable_tls") is True:
+        insecure = _get_val(change, "allow_insecure_transport") is True or _get_val(change, "disable_tls") is True
+        if insecure:
             findings.append(
                 RiskFinding(
                     rule_id="RISK-CONFIG-002",
@@ -482,9 +522,9 @@ def check_dangerous_config(change: ProposedChange) -> list[RiskFinding]:
 def check_config_drift(change: ProposedChange, incident: Incident | None = None) -> list[RiskFinding]:
     """Evaluate configuration drift and environmental discrepancies."""
     findings: list[RiskFinding] = []
-    params = change.parameters
 
-    if params.get("config_drift_detected") is True or (
+    drift_detected = _get_val(change, "config_drift_detected")
+    if drift_detected is True or (
         incident
         and "drift" in (getattr(incident.metadata, "impact_summary", "") or "").lower()
         and change.service.lower() == (getattr(incident.metadata, "affected_service", "") or "").lower()
@@ -546,7 +586,17 @@ def check_insufficient_input(change: ProposedChange) -> list[RiskFinding]:
     findings: list[RiskFinding] = []
 
     desc = change.description.strip()
-    has_params = bool(change.parameters)
+    has_params = bool(change.parameters) or any(
+        getattr(change, k, None) is not None
+        for k in [
+            "memory_limit_mb",
+            "cpu_limit",
+            "concurrency",
+            "pool_max",
+            "timeout_seconds",
+            "image_tag",
+        ]
+    )
 
     if len(desc) < 5 and not has_params:
         findings.append(
@@ -569,3 +619,332 @@ def check_insufficient_input(change: ProposedChange) -> list[RiskFinding]:
         )
 
     return findings
+
+
+# =============================================================================
+# 2. DIAGNOSIS-AWARE RECURRENCE PREVENTION RULES
+# =============================================================================
+
+
+def evaluate_diagnosis_prevention_rules(
+    change: ProposedChange,
+    incident: Incident | None = None,
+    diag_context: DiagnosisContext | None = None,
+) -> tuple[list[RiskFinding], DiagnosisAlignmentInfo, RecurrencePrediction, list[str]]:
+    """Evaluate proposed change against verified incident diagnosis, observed telemetry, and AERO recommendations."""
+    prevention_findings: list[RiskFinding] = []
+    evidence_used: list[str] = []
+
+    # 1. Extract incident metadata & telemetry facts
+    affected_svc = getattr(incident.metadata, "affected_service", "") if incident else ""
+    target_svc = change.service or getattr(change, "target_service", "") or ""
+    is_affected_service = bool(affected_svc and target_svc.lower() == affected_svc.lower())
+
+    # Extract quantitative facts from telemetry
+    peak_mem_pct = 0.0
+    peak_mem_mb = 0.0
+    metric_source = ""
+    oom_log_count = 0
+    if incident and incident.telemetry:
+        for series in incident.telemetry.metrics:
+            if "memory" in series.metric_name.lower():
+                metric_source = series.metric_name
+                for pt in series.points:
+                    if series.unit == "percent":
+                        peak_mem_pct = max(peak_mem_pct, pt.value)
+                    else:
+                        val_mb = pt.value / (1024 * 1024) if pt.value > 1000000 else pt.value
+                        peak_mem_mb = max(peak_mem_mb, val_mb)
+        for log in incident.telemetry.logs:
+            msg = log.message.lower()
+            if "oom" in msg or "killed" in msg or "out of memory" in msg:
+                oom_log_count += 1
+
+    # Extract diagnosis details
+    root_cause = ""
+    diag_category = ""
+    aero_recs: list[str] = []
+    if diag_context:
+        root_cause = diag_context.root_cause or ""
+        diag_category = (diag_context.diagnosis_category or "").upper()
+        aero_recs = diag_context.recommendations or diag_context.mitigation_actions or []
+        evidence_used.extend(diag_context.observed_evidence or [])
+        evidence_used.extend(diag_context.telemetry_facts or [])
+    elif incident:
+        root_cause = getattr(incident.metadata, "impact_summary", "") or getattr(incident.metadata, "title", "")
+        diag_category = getattr(incident.metadata, "severity", "CRITICAL")
+        if peak_mem_pct >= 85.0 or oom_log_count > 0:
+            diag_category = "RESOURCE_EXHAUSTION_MEMORY"
+            root_cause = "Container memory exhaustion triggering Linux cgroup OOM-killer"
+            aero_recs = [
+                "Increase container memory limit to >= 2048 MB to provide heap headroom",
+                "Maintain bounded worker concurrency (e.g. 10 workers)",
+                "Configure automated canary rollback triggers",
+            ]
+
+    if peak_mem_pct > 0:
+        evidence_used.append(f"Observed peak memory utilization: {peak_mem_pct:.2f}% ({metric_source})")
+    if peak_mem_mb > 0:
+        evidence_used.append(f"Observed peak memory footprint: {peak_mem_mb:.0f} MB")
+    if oom_log_count > 0:
+        evidence_used.append(f"Recorded {oom_log_count} kernel/cgroup OOMKilled eviction events")
+
+    # Parameters from proposed change
+    mem_lim = _get_val(change, "memory_limit_mb", "memory_limit")
+    concurrency = _get_val(change, "concurrency", "worker_count", "workers", "thread_pool_size")
+    pool_max = _get_val(change, "pool_max", "pool_max_size", "db_pool_size")
+    has_rollback = bool(change.rollback_plan or _get_val(change, "rollback_version"))
+
+    # Determine failure mode type
+    is_memory_failure = (
+        "memory" in diag_category.lower()
+        or "oom" in diag_category.lower()
+        or "resource_exhaustion" in diag_category.lower()
+        or "memory" in root_cause.lower()
+        or "oom" in root_cause.lower()
+        or peak_mem_pct >= 85.0
+        or oom_log_count > 0
+    )
+
+    # Check parameter distribution
+    has_mem_param = mem_lim is not None and float(mem_lim or 0) > 0
+    has_conc_param = concurrency is not None
+    has_other_params = pool_max is not None or _get_val(change, "timeout_ms") is not None or _get_val(change, "log_level") is not None
+    is_unrelated_config_only = has_other_params and not has_mem_param and not has_conc_param
+
+    # -------------------------------------------------------------------------
+    # RULE A: RISK-PREV-001 — ROOT CAUSE ALIGNMENT (Memory Pressure)
+    # -------------------------------------------------------------------------
+    if is_memory_failure and is_affected_service and not is_unrelated_config_only:
+        has_adequate_memory = False
+        if mem_lim is not None:
+            try:
+                has_adequate_memory = float(mem_lim) >= 2048
+            except (ValueError, TypeError):
+                pass
+
+        if not has_adequate_memory:
+            cur_val = float(mem_lim) if mem_lim is not None else 0
+            findings_facts = [
+                f"Diagnosed root cause on '{target_svc}': {root_cause or 'Memory exhaustion / OOMKilled'}.",
+            ]
+            if peak_mem_pct > 0:
+                findings_facts.append(f"Observed telemetry memory peak reached {peak_mem_pct:.1f}% ({peak_mem_mb:.0f} MB).")
+            findings_facts.append(
+                f"Proposed memory limit ({cur_val:.0f} MB) does not provide recommended headroom (>= 2048 MB)."
+            )
+
+            prevention_findings.append(
+                RiskFinding(
+                    rule_id="RISK-PREV-001",
+                    title="Proposed Change Does Not Address Diagnosed Memory Exhaustion",
+                    severity=RiskSeverity.HIGH,
+                    category=RiskCategory.RESOURCE_LIMITS,
+                    observed_facts=findings_facts,
+                    derived_risk=(
+                        "Deploying without sufficient memory headroom leaves the target container vulnerable "
+                        "to identical heap saturation and OOM-killer termination under production load."
+                    ),
+                    recommendations=[
+                        "Increase memory_limit_mb to at least 2048 MB to accommodate peak heap demands.",
+                        "Align container cgroup limits with JVM/runtime heap allocations.",
+                    ],
+                    score_impact=30,
+                )
+            )
+
+    # -------------------------------------------------------------------------
+    # RULE B: RISK-PREV-002 — RECURRENCE PREDICTION (Severe Under-Provisioning)
+    # -------------------------------------------------------------------------
+    if is_memory_failure and is_affected_service and mem_lim is not None:
+        try:
+            lim_val = float(mem_lim)
+            if (peak_mem_pct >= 85.0 or peak_mem_mb >= 1024 or oom_log_count > 0) and lim_val <= 1024:
+                prevention_findings.append(
+                    RiskFinding(
+                        rule_id="RISK-PREV-002",
+                        title="High Recurrence Risk: Memory Limit Below Observed Saturation Peak",
+                        severity=RiskSeverity.CRITICAL,
+                        category=RiskCategory.RESOURCE_LIMITS,
+                        observed_facts=[
+                            f"Proposed container memory limit is only {lim_val:.0f} MB.",
+                            f"Incident telemetry recorded saturated memory peak of {peak_mem_pct:.1f}% (~{peak_mem_mb:.0f} MB) with {oom_log_count} OOM events.",
+                        ],
+                        derived_risk=(
+                            f"The proposed memory boundary ({lim_val:.0f} MB) is strictly below the actual workload "
+                            "consumption observed during the incident. Pods will experience immediate OOMKilled crash loops."
+                        ),
+                        recommendations=[
+                            "Increase memory limit to >= 2048 MB to provide safety margin above observed peak.",
+                        ],
+                        score_impact=40,
+                    )
+                )
+        except (ValueError, TypeError):
+            pass
+
+    # -------------------------------------------------------------------------
+    # RULE C: RISK-PREV-003 — CONCURRENCY MULTIPLICATION UNDER RESOURCE PRESSURE
+    # -------------------------------------------------------------------------
+    if is_memory_failure and is_affected_service and concurrency is not None:
+        try:
+            conc_val = int(concurrency)
+            lim_val = float(mem_lim or 1024)
+            # Baseline concurrency is 10; scaling to >= 50 or 100 without >= 4096MB memory is dangerous
+            if conc_val >= 50 and lim_val < 4096:
+                prevention_findings.append(
+                    RiskFinding(
+                        rule_id="RISK-PREV-003",
+                        title="Aggressive Concurrency Scaling Without Proportional Memory Headroom",
+                        severity=RiskSeverity.CRITICAL,
+                        category=RiskCategory.RESOURCE_LIMITS,
+                        observed_facts=[
+                            f"Diagnosed failure mode: {root_cause or 'Memory exhaustion'}.",
+                            f"Proposed change increases worker concurrency to {conc_val} (10x baseline).",
+                            f"Container memory limit ({lim_val:.0f} MB) is insufficient for {conc_val} concurrent worker threads.",
+                        ],
+                        derived_risk=(
+                            f"Multiplying concurrent worker threads to {conc_val} dramatically inflates active per-thread "
+                            "heap buffers, exponentially accelerating memory exhaustion and triggering instantaneous OOM termination."
+                        ),
+                        recommendations=[
+                            "Maintain bounded worker concurrency (e.g. 10 workers) until heap consumption is profiled.",
+                            "If high concurrency is mandatory, allocate at least 4096 MB memory and scale horizontally.",
+                        ],
+                        score_impact=35,
+                    )
+                )
+        except (ValueError, TypeError):
+            pass
+
+    # -------------------------------------------------------------------------
+    # RULE D: RISK-PREV-004 — CONTRADICTION OF AERO RECOMMENDATIONS
+    # -------------------------------------------------------------------------
+    if is_memory_failure and is_affected_service and concurrency is not None:
+        try:
+            conc_val = int(concurrency)
+            if conc_val > 20:
+                prevention_findings.append(
+                    RiskFinding(
+                        rule_id="RISK-PREV-004",
+                        title="Proposed Change Contradicts AERO Diagnostic Mitigation Guidance",
+                        severity=RiskSeverity.HIGH,
+                        category=RiskCategory.DANGEROUS_CONFIG,
+                        observed_facts=[
+                            "AERO Incident Recommendation: Maintain bounded concurrency (10 workers) and increase memory headroom.",
+                            f"Proposed Change: Expands worker concurrency to {conc_val}.",
+                        ],
+                        derived_risk=(
+                            "Applying configurations that move counter to verified incident findings undermines stability "
+                            "and directly recreates the preconditions of the active failure."
+                        ),
+                        recommendations=[
+                            "Align concurrency limits with AERO recommended bounds (10-20 workers).",
+                        ],
+                        score_impact=25,
+                    )
+                )
+        except (ValueError, TypeError):
+            pass
+
+    # -------------------------------------------------------------------------
+    # RULE E: RISK-PREV-005 — UNRELATED CHANGE NOT ADDRESSING ROOT CAUSE
+    # -------------------------------------------------------------------------
+    if is_memory_failure and is_affected_service:
+        # Check if the proposed change modified secondary parameters (pool, timeout, log) but ignored memory
+        has_mem_param = mem_lim is not None and float(mem_lim or 0) > 0
+        has_conc_param = concurrency is not None
+        has_other_params = pool_max is not None or _get_val(change, "timeout_ms") is not None or _get_val(change, "log_level") is not None
+        if has_other_params and not has_mem_param and not has_conc_param:
+            prevention_findings.append(
+                RiskFinding(
+                    rule_id="RISK-PREV-005",
+                    title="Proposed Deployment Does Not Address Diagnosed Incident Root Cause",
+                    severity=RiskSeverity.HIGH,
+                    category=RiskCategory.RESOURCE_LIMITS,
+                    observed_facts=[
+                        f"Active incident root cause is {root_cause or 'Memory exhaustion'}.",
+                        "Proposed configuration modifies connection/timeout parameters but omits corrective memory limit adjustments.",
+                    ],
+                    derived_risk=(
+                        "The proposed deployment will deploy cleanly but fails to remediate the underlying incident vulnerability, "
+                        "leaving the service exposed to recurrence under peak load."
+                    ),
+                    recommendations=[
+                        "Include corrective memory limits (memory_limit_mb: 2048) in this deployment package.",
+                    ],
+                    score_impact=20,
+                )
+            )
+
+    # -------------------------------------------------------------------------
+    # SYNTHESIZE DIAGNOSIS ALIGNMENT & RECURRENCE PREDICTION
+    # -------------------------------------------------------------------------
+    has_crit_prev = any(f.severity == RiskSeverity.CRITICAL for f in prevention_findings)
+    has_high_prev = any(f.severity == RiskSeverity.HIGH for f in prevention_findings)
+
+    # Recurrence Prediction
+    sat_desc = f"{peak_mem_pct:.1f}% peak ({peak_mem_mb:.0f} MB)" if peak_mem_mb > 0 else f"{peak_mem_pct:.1f}% peak saturation"
+    if has_crit_prev:
+        rec_risk = RiskSeverity.CRITICAL
+        likely_rec = True
+        rec_reason = (
+            f"Proposed configuration remains below observed saturation conditions ({sat_desc}). "
+            "High probability of immediate recurrence under identical production traffic."
+        )
+    elif has_high_prev:
+        rec_risk = RiskSeverity.HIGH
+        likely_rec = True
+        rec_reason = (
+            "Proposed change modifies configuration but does not adequately provide memory headroom or bounds concurrency. "
+            "Likely recurrence under peak workload surges."
+        )
+    elif is_memory_failure and is_affected_service and mem_lim is not None and float(mem_lim or 0) >= 2048:
+        rec_risk = RiskSeverity.LOW
+        likely_rec = False
+        rec_reason = (
+            "Proposed change addresses the diagnosed memory exhaustion mechanism and provides sufficient resource headroom "
+            f"(2048 MB) well above observed peak saturation conditions ({peak_mem_pct:.1f}%)."
+        )
+    elif not is_affected_service and incident:
+        rec_risk = RiskSeverity.LOW
+        likely_rec = False
+        rec_reason = "Target service is isolated from active incident blast radius."
+    else:
+        rec_risk = RiskSeverity.LOW
+        likely_rec = False
+        rec_reason = "No recurrence risk patterns detected against current incident evidence."
+
+    predicted_recurrence = RecurrencePrediction(
+        risk=rec_risk,
+        likely_recurrence=likely_rec,
+        reason=rec_reason,
+    )
+
+    # Diagnosis Alignment Info
+    is_aligned = len(prevention_findings) == 0 and bool(mem_lim and float(mem_lim or 0) >= 2048) if is_memory_failure else len(prevention_findings) == 0
+    if is_aligned:
+        alignment_summary = (
+            f"Proposed deployment directly implements AERO incident recommendations: provides 2048 MB memory headroom, "
+            f"maintains bounded concurrency, and includes {'validated rollback targets' if has_rollback else 'standard release tags'}."
+        )
+    else:
+        alignment_summary = (
+            f"Proposed deployment deviates from AERO diagnostic findings: {len(prevention_findings)} prevention risk findings detected."
+        )
+
+    obs_peak_str = (
+        f"{peak_mem_pct:.1f}% ({peak_mem_mb:.0f} MB)" if peak_mem_mb > 0
+        else (f"{peak_mem_pct:.1f}%" if peak_mem_pct > 0 else "Baseline nominal")
+    )
+
+    diagnosis_alignment = DiagnosisAlignmentInfo(
+        root_cause=root_cause or "Diagnosed service incident",
+        diagnosis_category=diag_category or "RESOURCE_EXHAUSTION_MEMORY",
+        observed_peak=obs_peak_str,
+        aero_recommendations=aero_recs or ["Increase memory limit to >= 2048 MB", "Maintain bounded worker concurrency"],
+        is_aligned=is_aligned,
+        alignment_summary=alignment_summary,
+    )
+
+    return prevention_findings, diagnosis_alignment, predicted_recurrence, evidence_used

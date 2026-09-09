@@ -25,7 +25,7 @@ from src.schemas.chat import ChatResponse
 from src.schemas.diagnostic import AeroDiagnosticReport
 from src.schemas.ground_truth import BenchmarkScenarioBundle
 from src.schemas.incident import Incident
-from src.schemas.risk import RiskAnalysisRequest, RiskAnalysisResponse
+from src.schemas.risk import DiagnosisContext, RiskAnalysisRequest, RiskAnalysisResponse
 from src.schemas.timeline import IncidentReplaySeries, IncidentTimeline
 from src.schemas.topology import (
     BlastRadiusReport,
@@ -204,14 +204,38 @@ class AeroService:
         request: RiskAnalysisRequest,
         seed: int = 42,
     ) -> RiskAnalysisResponse:
-        """Evaluates proposed deployment/configuration changes using deterministic safety rules."""
+        """Evaluates proposed deployment/configuration changes against generic safety rules and incident diagnosis."""
         incident = None
+        diag_context = request.diagnosis_context
         if request.scenario_key:
             bundle = cls.get_scenario_bundle(request.scenario_key, seed=seed)
             incident = bundle.incident
+            if diag_context is None:
+                # Extract deterministic diagnosis context from scenario bundle
+                diag_resp = cls.diagnose(incident, provider="mock")
+                report = diag_resp.report
+                root_title = report.probable_root_cause.title if report.probable_root_cause else ""
+                root_desc = report.probable_root_cause.description if report.probable_root_cause else ""
+                cat = report.probable_root_cause.category if report.probable_root_cause else "RESOURCE_EXHAUSTION_MEMORY"
+                conf = report.confidence_level.score if report.confidence_level else 0.95
+                ev_claims = [e.content for e in (report.supporting_evidence or [])]
+                recs = report.recommended_remediation.immediate_steps if report.recommended_remediation else []
+
+                diag_context = DiagnosisContext(
+                    root_cause=f"{root_title}: {root_desc}" if root_desc else root_title,
+                    diagnosis_category=cat,
+                    diagnosis_confidence=conf,
+                    observed_evidence=ev_claims,
+                    telemetry_facts=[
+                        f"{m.metric_name}: {m.unit}"
+                        for m in (incident.telemetry.metrics or [])
+                    ],
+                    recommendations=recs,
+                    mitigation_actions=recs,
+                )
 
         engine = DeterministicRiskEngine()
-        return engine.analyze_request(request, incident=incident)
+        return engine.analyze_request(request, incident=incident, diagnosis_context=diag_context)
 
     @classmethod
     def get_topology(
