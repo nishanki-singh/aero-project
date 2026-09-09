@@ -52,11 +52,38 @@ class AppState {
         default_model: 'gemini-2.5-flash'
       },
       isLoading: false,
-      error: null
-
+      error: null,
+      leftRailCollapsed: false
     };
 
     this.listeners = new Set();
+  }
+
+  /**
+   * Direct property accessors
+   */
+  get leftRailCollapsed() {
+    return this.state.leftRailCollapsed;
+  }
+
+  get activeTab() {
+    return this.state.activeTab;
+  }
+
+  get activeScenarioKey() {
+    return this.state.activeScenarioKey;
+  }
+
+  get activeScenarioData() {
+    return this.state.activeScenarioData;
+  }
+
+  get scenarios() {
+    return this.state.scenarios;
+  }
+
+  get providerMode() {
+    return this.state.providerMode;
   }
 
   /**
@@ -102,3 +129,7 @@ class AppState {
 }
 
 export const store = new AppState();
+
+if (typeof window !== 'undefined') {
+  window.store = store;
+}

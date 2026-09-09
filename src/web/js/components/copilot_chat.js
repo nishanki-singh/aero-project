@@ -86,7 +86,7 @@ function renderDrawerStructure(drawer) {
     <div class="copilot-header">
       <div class="copilot-header-title-group">
         <div class="copilot-eyebrow">
-          <span>⚡ AERO SRE COPILOT</span>
+          <span>⚡ AERO COPILOT</span>
           <span class="badge ${isLive ? 'badge-warning' : 'badge-healthy'} font-mono" style="font-size: 9.5px;">
             ${isLive ? 'Live Vertex AI' : 'Deterministic Mock'}
           </span>
@@ -136,7 +136,7 @@ function renderDrawerStructure(drawer) {
           class="copilot-textarea"
           placeholder="Ask AERO about root cause, evidence, or next steps..."
           rows="1"
-          aria-label="SRE Copilot query input"
+          aria-label="AERO Copilot query input"
         ></textarea>
         <button type="button" class="btn-copilot-send" id="btn-copilot-send" title="Send question">
           <span>Ask</span>
@@ -360,7 +360,7 @@ async function submitUserMessage(userMessage) {
     console.error('Copilot request failed:', err);
     store.setState({
       copilotLoading: false,
-      copilotError: err.message || 'Failed to reach SRE Copilot service.'
+      copilotError: err.message || 'Failed to reach AERO Copilot service.'
     });
   }
   renderMessages();
@@ -382,7 +382,7 @@ function renderMessages() {
     container.innerHTML = `
       <div class="copilot-welcome-card">
         <div class="copilot-welcome-icon">💬</div>
-        <div class="copilot-welcome-title">Ask AERO SRE Copilot</div>
+        <div class="copilot-welcome-title">Ask AERO Copilot</div>
         <p class="copilot-welcome-desc">
           Get real-time causal answers grounded in the active telemetry. Answers separate 
           <strong>Observed Evidence</strong>, <strong>Derived Inferences</strong>, and <strong>Recommendations</strong>.

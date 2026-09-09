@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AERO — AI-Enabled Reliability & Operations Copilot</title>
-  <meta name="description" content="AERO: Autonomous Cloud Reliability & SRE Copilot powered by Google Cloud Vertex AI & Gemini">
+  <title>AERO — AI-Enabled Reliability and Operations</title>
+  <meta name="description" content="AERO: Autonomous Cloud Reliability and AI-Enabled Reliability and Operations platform powered by Google Cloud Vertex AI & Gemini">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   
   <!-- CSS Stylesheets -->
@@ -28,41 +28,39 @@
     <!-- Top Command Center Header -->
     <header class="app-header" id="app-header">
       <div class="header-left">
-        <a href="#" class="brand-container" id="brand-link">
+        <a href="#" class="brand-container" id="brand-link" title="AERO — AI-Enabled Reliability and Operations">
           <div class="brand-icon">⚡</div>
           <div class="brand-text">
             <span class="brand-title">AERO</span>
-            <span class="brand-subtitle">Google Cloud SRE Copilot</span>
+            <span class="brand-subtitle">AI-Enabled Reliability and Operations</span>
           </div>
         </a>
       </div>
 
       <div class="header-center">
         <div class="scenario-selector-container">
-          <span class="scenario-label">Scenario:</span>
-          <select id="scenario-select" class="scenario-select" aria-label="Incident Scenario Selection">
+          <label for="scenario-select" class="scenario-label">Scenario:</label>
+          <select id="scenario-select" class="scenario-select" aria-label="Incident Scenario Selection" title="Select Incident Scenario">
             <option value="" disabled selected>Loading scenarios...</option>
           </select>
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- GCP Cloud Project Indicator -->
-        <div class="gcp-info-badge" id="gcp-badge" title="Target Google Cloud Project & Region">
-          <span class="gcp-dot"></span>
-          <span class="project-id" id="gcp-project-id">project-a47199cc-a109-4cd5-917</span>
-          <span class="region-tag" id="gcp-region">us-central1</span>
-        </div>
+      <!-- GCP Cloud Project Indicator -->
+      <div class="gcp-info-badge" id="gcp-badge" title="Target Google Cloud Project & Region">
+        <span class="gcp-dot"></span>
+        <span class="project-id" id="gcp-project-id">project-a47199cc-a109-4cd5-917</span>
+        <span class="region-tag" id="gcp-region">us-central1</span>
+      </div>
 
-        <!-- Provider Control (Mock by default) -->
-        <div class="provider-toggle-group" id="provider-toggle" role="group" aria-label="AI Engine Provider Mode">
-          <button type="button" class="provider-btn active" id="btn-provider-mock" data-provider="mock">
-            MOCK
-          </button>
-          <button type="button" class="provider-btn live" id="btn-provider-live" data-provider="live" title="Vertex AI Live Inference (Configuration element - requires explicit run)">
-            LIVE VERTEX
-          </button>
-        </div>
+      <!-- Provider Control (Mock by default) -->
+      <div class="provider-toggle-group" id="provider-toggle" role="group" aria-label="AI Engine Provider Mode">
+        <button type="button" class="provider-btn active" id="btn-provider-mock" data-provider="mock" title="Mock AI Provider Mode">
+          MOCK
+        </button>
+        <button type="button" class="provider-btn live" id="btn-provider-live" data-provider="live" title="Vertex AI Live Inference">
+          LIVE VERTEX
+        </button>
       </div>
     </header>
 
@@ -125,6 +123,20 @@
       <!-- Left Column: Incident Context & Telemetry Summary -->
       <section class="left-pane" id="left-pane" aria-label="Incident Telemetry & Context">
         
+        <!-- Rail Header with Collapse Toggle -->
+        <div class="rail-header" id="rail-header" title="Click to Collapse Evidence Rail" role="button" tabindex="0" aria-label="Collapse Evidence Rail">
+          <span class="rail-header-title">Evidence Rail</span>
+          <button type="button" class="rail-toggle-btn" id="btn-toggle-left-rail" title="Collapse Evidence Rail" aria-label="Collapse Evidence Rail" aria-expanded="true">
+            <span class="rail-toggle-icon" id="rail-toggle-icon">◀</span>
+          </button>
+        </div>
+
+        <!-- Collapsed Vertical Rail Indicator Strip -->
+        <div class="collapsed-rail-strip" id="collapsed-rail-strip" title="Click to Expand Evidence Rail" role="button" tabindex="0" aria-label="Expand Evidence Rail">
+          <span class="collapsed-rail-icon">▶</span>
+          <span class="collapsed-rail-text">EVIDENCE RAIL</span>
+        </div>
+
         <!-- Active Incident Summary Card -->
         <div class="pane-card incident-summary-card" id="incident-summary-card">
           <div class="pane-header">
@@ -195,9 +207,9 @@
         <span>⚡</span>
         <span>Risk Advisor</span>
       </button>
-      <button type="button" class="dock-btn" id="btn-dock-chat" title="Interactive SRE Copilot Chat">
+      <button type="button" class="dock-btn" id="btn-dock-chat" title="Interactive AERO Copilot Chat">
         <span>💬</span>
-        <span>SRE Copilot</span>
+        <span>AERO Copilot</span>
       </button>
     </div>
 

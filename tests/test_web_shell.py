@@ -16,7 +16,7 @@ def test_web_shell_root_serves_html():
 
     # Core Branding & Title
     assert "AERO" in content
-    assert "Google Cloud SRE Copilot" in content
+    assert "AI-Enabled Reliability and Operations" in content
     
     # Header & Control elements
     assert 'id="scenario-select"' in content

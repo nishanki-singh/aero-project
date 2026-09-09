@@ -444,7 +444,7 @@ function initLifecycleNav() {
 }
 
 /**
- * Initialize floating quick action buttons (Risk Advisor & SRE Copilot).
+ * Initialize floating quick action buttons (Risk Advisor & AERO Copilot).
  */
 function initDockActions() {
   const btnRisk = document.getElementById('btn-dock-risk');
@@ -464,6 +464,96 @@ function initDockActions() {
 }
 
 /**
+ * Initialize Left Evidence Rail collapse / expand toggle control.
+ */
+function initLeftRailToggle() {
+  const btnToggle = document.getElementById('btn-toggle-left-rail');
+  const railHeader = document.getElementById('rail-header');
+  const collapsedStrip = document.getElementById('collapsed-rail-strip');
+  const mainWorkspace = document.getElementById('main-workspace');
+  const leftPane = document.getElementById('left-pane');
+  const toggleIcon = document.getElementById('rail-toggle-icon');
+
+  function updateRailUI(isCollapsed) {
+    if (mainWorkspace) {
+      if (isCollapsed) {
+        mainWorkspace.classList.add('rail-collapsed');
+        mainWorkspace.setAttribute('data-rail-collapsed', 'true');
+      } else {
+        mainWorkspace.classList.remove('rail-collapsed');
+        mainWorkspace.setAttribute('data-rail-collapsed', 'false');
+      }
+    }
+    if (leftPane) {
+      if (isCollapsed) {
+        leftPane.classList.add('collapsed');
+      } else {
+        leftPane.classList.remove('collapsed');
+      }
+    }
+    if (btnToggle) {
+      btnToggle.setAttribute('aria-expanded', String(!isCollapsed));
+      btnToggle.setAttribute('title', isCollapsed ? 'Expand Evidence Rail' : 'Collapse Evidence Rail');
+    }
+    if (railHeader) {
+      railHeader.setAttribute('aria-expanded', String(!isCollapsed));
+      railHeader.setAttribute('title', isCollapsed ? 'Click to Expand Evidence Rail' : 'Click to Collapse Evidence Rail');
+    }
+    if (toggleIcon) {
+      toggleIcon.textContent = isCollapsed ? '▶' : '◀';
+    }
+  }
+
+  function toggleRail(e) {
+    if (e) e.stopPropagation();
+    const current = store.getState().leftRailCollapsed;
+    store.setState({ leftRailCollapsed: !current });
+  }
+
+  if (btnToggle) {
+    btnToggle.addEventListener('click', toggleRail);
+  }
+
+  if (railHeader) {
+    railHeader.addEventListener('click', (e) => {
+      // Don't double trigger if btnToggle itself was clicked
+      if (e.target !== btnToggle && !btnToggle.contains(e.target)) {
+        toggleRail(e);
+      }
+    });
+    railHeader.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleRail(e);
+      }
+    });
+  }
+
+  if (collapsedStrip) {
+    collapsedStrip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      store.setState({ leftRailCollapsed: false });
+    });
+    collapsedStrip.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        store.setState({ leftRailCollapsed: false });
+      }
+    });
+  }
+
+  // Subscribe to reactive store changes
+  store.subscribe((state, prevState) => {
+    if (state.leftRailCollapsed !== prevState.leftRailCollapsed) {
+      updateRailUI(state.leftRailCollapsed);
+    }
+  });
+
+  // Initial synchronization
+  updateRailUI(store.getState().leftRailCollapsed);
+}
+
+/**
  * Main application bootstrap function.
  */
 async function bootstrapApp() {
@@ -477,9 +567,10 @@ async function bootstrapApp() {
     initCopilotDrawer();
     initRiskAdvisorDrawer();
 
-    // 2. Initialize Navigation & Actions
+    // 2. Initialize Navigation, Actions & Rail Controls
     initLifecycleNav();
     initDockActions();
+    initLeftRailToggle();
 
     // 3. Subscribe to reactive state updates
     store.subscribe((state, prevState) => {

@@ -30,12 +30,15 @@ export function initHeader(onScenarioChange) {
       const title = sc.scenario_name || sc.title || key;
       const service = sc.affected_service || sc.service_name || 'Cloud Service';
       const category = sc.category || 'INCIDENT';
+      const label = `[${category}] ${title} (${service})`;
       
       const opt = document.createElement('option');
       opt.value = key;
-      opt.textContent = `[${category}] ${title} (${service})`;
+      opt.textContent = label;
+      opt.title = label;
       if (key === activeKey) {
         opt.selected = true;
+        scenarioSelect.title = label;
       }
       scenarioSelect.appendChild(opt);
     });
@@ -67,6 +70,10 @@ export function initHeader(onScenarioChange) {
   if (scenarioSelect) {
     scenarioSelect.addEventListener('change', (e) => {
       const selectedKey = e.target.value;
+      const selectedOption = scenarioSelect.options[scenarioSelect.selectedIndex];
+      if (selectedOption) {
+        scenarioSelect.title = selectedOption.textContent;
+      }
       if (selectedKey && typeof onScenarioChange === 'function') {
         onScenarioChange(selectedKey);
       }
