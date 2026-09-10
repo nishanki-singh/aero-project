@@ -1,4 +1,4 @@
-# AERO — AI-Enabled Reliability & Operations
+# AERO: AI-Enabled Reliability & Operations
 
 > **Next-generation incident intelligence copilot that helps engineering teams understand, resolve, learn from, and prevent production outages in cloud-native applications.**
 
